@@ -1,40 +1,40 @@
-# NotBroke - Plateforme de gestion des dépenses
+# NotBroke - Expense Management Platform
 
-Une application full-stack moderne pour gérer vos catégories de dépenses, ajouter des transactions et obtenir des résumés détaillés. Elle comprend un backend API robuste avec FastAPI et un frontend interactif avec Next.js.
+A modern full-stack application for managing your expense categories, adding transactions, and getting detailed summaries. It includes a robust FastAPI backend and an interactive Next.js frontend.
 
-## Fonctionnalités principales
+## Main Features
 
-- **Gestion des catégories** : Création, modification, suppression et organisation hiérarchique des catégories (sous-catégories supportées).
-- **Gestion des dépenses** : Ajout, modification, suppression et recherche avancée par catégorie, date et montant.
-- **Résumés mensuels** : Calcul automatique des totaux par période et par catégorie.
-- **Export des données** : Export en CSV ou XLSX pour analyse externe.
-- **Interface utilisateur intuitive** : Design moderne avec Tailwind CSS, modales et composants réutilisables.
+- **Category Management**: Create, edit, delete and organize categories hierarchically (sub-categories supported).
+- **Expense Management**: Add, edit, delete and perform advanced searches by category, date and amount.
+- **Monthly Summaries**: Automatic calculation of totals by period and category.
+- **Data Export**: Export to CSV or XLSX for external analysis.
+- **Intuitive User Interface**: Modern design with Tailwind CSS, modals and reusable components.
 
-## Aperçu de l'architecture
+## Architecture Overview
 
-- **Backend** : API FastAPI asynchrone avec SQLAlchemy + SQLite, supportant les opérations CRUD complètes, recherche et export.
-- **Frontend** : Application Next.js (React 19) avec React Query pour la gestion des données, Zustand pour l'état global, et Tailwind CSS pour le styling.
+- **Backend**: Asynchronous FastAPI API with SQLAlchemy + SQLite, supporting complete CRUD operations, search and export.
+- **Frontend**: Next.js application (React 19) with React Query for data management, Zustand for global state, and Tailwind CSS for styling.
 
-## Prérequis
+## Prerequisites
 
-- Python 3.11+ (recommandé : utiliser `uv` ou `pyenv` pour la gestion des versions).
-- Node.js 18+ (LTS recommandé).
-- npm ou yarn (installé avec Node.js).
+- Python 3.11+ (recommended: use `uv` or `pyenv` for version management).
+- Node.js 18+ (LTS recommended).
+- npm or yarn (installed with Node.js).
 
 ## Backend
 
-### Installation et configuration
+### Installation and Setup
 
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # Sur Windows : venv\Scripts\activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-> Le backend utilise SQLite par défaut via la variable `DATABASE_URL`. Vous pouvez la surcharger dans un fichier `.env` si nécessaire (ex. : `DATABASE_URL=sqlite:///./expense.db`).
+> The backend uses SQLite by default via the `DATABASE_URL` variable. You can override it in a `.env` file if needed (e.g.: `DATABASE_URL=sqlite:///./expense.db`).
 
-### Lancement du serveur
+### Starting the Server
 
 ```bash
 cd backend
@@ -42,31 +42,31 @@ source venv/bin/activate
 uvicorn app.main:app --reload
 ```
 
-L'API sera accessible sur `http://127.0.0.1:8000`.
+The API will be accessible at `http://127.0.0.1:8000`.
 
-### Endpoints principaux
+### Main Endpoints
 
-- **Catégories** :
-  - `POST /categories` : Créer une nouvelle catégorie.
-  - `GET /categories` : Lister toutes les catégories.
-  - `GET /categories/{id}` : Obtenir une catégorie spécifique.
-  - `PATCH /categories/{id}` : Mettre à jour une catégorie.
-  - `DELETE /categories/{id}` : Supprimer une catégorie.
+- **Categories**:
+  - `POST /categories`: Create a new category.
+  - `GET /categories`: List all categories.
+  - `GET /categories/{id}`: Get a specific category.
+  - `PATCH /categories/{id}`: Update a category.
+  - `DELETE /categories/{id}`: Delete a category.
 
-- **Dépenses** :
-  - `POST /expenses` : Ajouter une nouvelle dépense.
-  - `GET /expenses` : Rechercher des dépenses (avec filtres par catégorie, date).
-  - `GET /categories/{category_id}/expenses` : Lister les dépenses d'une catégorie.
-  - `PATCH /expenses/{id}` : Mettre à jour une dépense.
-  - `DELETE /expenses/{id}` : Supprimer une dépense.
+- **Expenses**:
+  - `POST /expenses`: Add a new expense.
+  - `GET /expenses`: Search expenses (with filters by category, date).
+  - `GET /categories/{category_id}/expenses`: List expenses for a category.
+  - `PATCH /expenses/{id}`: Update an expense.
+  - `DELETE /expenses/{id}`: Delete an expense.
 
-- **Résumés et export** :
-  - `GET /summary` : Obtenir le résumé mensuel (totaux par catégorie et période).
-  - `GET /expenses/export` : Exporter les dépenses en CSV ou XLSX.
+- **Summaries and Export**:
+  - `GET /summary`: Get monthly summary (totals by category and period).
+  - `GET /expenses/export`: Export expenses to CSV or XLSX.
 
 ## Frontend
 
-### Installation et configuration
+### Installation and Setup
 
 ```bash
 cd frontend
@@ -75,61 +75,61 @@ npm install
 
 ### Configuration
 
-Créez un fichier `.env.local` à la racine du dossier `frontend/` pour personnaliser l'URL de l'API :
+Create a `.env.local` file at the root of the `frontend/` folder to customize the API URL:
 
 ```
 VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-> Si non défini, l'API par défaut est utilisée.
+> If not defined, the default API is used.
 
-### Lancer l'application
+### Starting the Application
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-Ouvrez `http://localhost:3000` dans votre navigateur (port par défaut de Next.js).
+Open `http://localhost:3000` in your browser (Next.js default port).
 
-### Fonctionnalités du frontend
+### Frontend Features
 
-- **Gestion des catégories** : Formulaires modaux pour créer/éditer des catégories avec support hiérarchique.
-- **Gestion des dépenses** : Interface pour ajouter des dépenses avec sélection de catégorie.
-- **Recherche et filtres** : Panel de recherche avec filtres par date et catégorie.
-- **Résumé mensuel** : Affichage des totaux et graphiques simples.
-- **Export** : Téléchargement des données en CSV ou XLSX.
-- **UI/UX** : Composants réutilisables (shadcn/ui-like) avec animations et responsive design.
+- **Category Management**: Modal forms for creating/editing categories with hierarchical support.
+- **Expense Management**: Interface for adding expenses with category selection.
+- **Search and Filters**: Search panel with filters by date and category.
+- **Monthly Summary**: Display of totals and simple charts.
+- **Export**: Download data in CSV or XLSX format.
+- **UI/UX**: Reusable components (shadcn/ui-like) with animations and responsive design.
 
-## Flux d'utilisation typique
+## Typical Usage Flow
 
-1. **Configurer les catégories** : Utilisez le panneau de catégories pour créer une hiérarchie (ex. : "Transport / Voiture" comme sous-catégorie).
-2. **Ajouter des dépenses** : Sélectionnez une catégorie et saisissez le montant et les détails via le formulaire principal.
-3. **Consulter et filtrer** : Utilisez le panneau de recherche pour filtrer par date ou catégorie.
-4. **Analyser les données** : Consultez le résumé mensuel pour voir les totaux par catégorie et exporter si besoin.
-5. **Gérer les données** : Modifiez ou supprimez des catégories/dépenses via les modales.
+1. **Set up categories**: Use the categories panel to create a hierarchy (e.g.: "Transportation / Car" as a subcategory).
+2. **Add expenses**: Select a category and enter the amount and details via the main form.
+3. **Browse and filter**: Use the search panel to filter by date or category.
+4. **Analyze data**: Check the monthly summary to see totals by category and export if needed.
+5. **Manage data**: Edit or delete categories/expenses via modals.
 
-## Développement et tests
+## Development and Testing
 
-- **Linting** :
-  - Backend : Utilisez `flake8` ou `black` si configuré (pas de script spécifique dans le projet actuel).
-  - Frontend : `npm run lint` (ESLint configuré).
+- **Linting**:
+  - Backend: Use `flake8` or `black` if configured (no specific script in the current project).
+  - Frontend: `npm run lint` (ESLint configured).
 
-- **Tests** :
-  - Backend : Aucun test défini actuellement ; recommandez `pytest` pour les tests unitaires.
-  - Frontend : Aucun test défini ; intégrez `Jest` ou `Vitest` pour les tests React.
+- **Testing**:
+  - Backend: No tests currently defined; recommend `pytest` for unit tests.
+  - Frontend: No tests defined; integrate `Jest` or `Vitest` for React tests.
 
-- **Base de données** : Les fichiers `expense.db` et `expense_backup.db` sont utilisés pour la persistance.
+- **Database**: The `expense.db` and `expense_backup.db` files are used for persistence.
 
-## Prochaines étapes et améliorations
+## Next Steps and Improvements
 
-- **Authentification** : Ajout d'un système de login/logout avec JWT.
-- **Visualisations** : Intégration de bibliothèques comme Chart.js pour des graphiques avancés.
-- **Notifications** : Alertes pour les dépassements de budget.
-- **Optimisations** : Migration vers PostgreSQL pour la production, ajout de caching (Redis).
-- **Déploiement** : Scripts Docker pour faciliter le déploiement.
+- **Authentication**: Add login/logout system with JWT.
+- **Visualizations**: Integration of libraries like Chart.js for advanced charts.
+- **Notifications**: Alerts for budget overruns.
+- **Optimizations**: Migration to PostgreSQL for production, add caching (Redis).
+- **Deployment**: Docker scripts to facilitate deployment.
 
-## Auteur et licence
+## Author and License
 
-Développé par [Issafulldev](https://github.com/Issafulldev). Ce projet est open-source sous licence MIT.
+Developed by [Issafulldev](https://github.com/Issafulldev). This project is open-source under the MIT license.
 
