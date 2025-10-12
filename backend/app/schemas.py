@@ -92,3 +92,35 @@ class MonthlySummary(BaseModel):
     end_date: datetime | None = None
     category_id: int | None = None
 
+
+class UserBase(BaseModel):
+    username: Annotated[str, Field(min_length=3, max_length=50)]
+    email: Annotated[str, Field(max_length=100)]
+
+
+class UserCreate(UserBase):
+    password: Annotated[str, Field(min_length=6, max_length=100)]
+
+
+class UserRead(UserBase):
+    id: int
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class TokenData(BaseModel):
+    username: str | None = None
+

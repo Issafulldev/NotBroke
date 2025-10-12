@@ -12,8 +12,10 @@ A modern full-stack application for managing your expense categories, adding tra
 
 ## Architecture Overview
 
-- **Backend**: Asynchronous FastAPI API with SQLAlchemy + SQLite, supporting complete CRUD operations, search and export.
+- **Backend**: Asynchronous FastAPI API with SQLAlchemy + SQLite, optimized for Railway's free tier with connection pooling, pagination, JWT authentication, and production-ready configurations.
 - **Frontend**: Next.js application (React 19) with React Query for data management, Zustand for global state, and Tailwind CSS for styling.
+- **Database**: SQLite with performance indexes and optimized for low-memory environments.
+- **Deployment**: Railway-optimized with custom startup scripts and environment-specific configurations.
 
 ## Prerequisites
 
@@ -36,27 +38,40 @@ pip install -r requirements.txt
 
 ### Starting the Server
 
+For development:
 ```bash
 cd backend
 source venv/bin/activate
 uvicorn app.main:app --reload
 ```
 
-The API will be accessible at `http://127.0.0.1:8000`.
+For production (Railway deployment):
+```bash
+# The application will be automatically started by start.sh
+# which includes performance optimizations for the free tier
+```
+
+The API will be accessible at `http://127.0.0.1:8000` (development) or your Railway domain (production).
+
+**Note**: The backend includes performance optimizations specifically designed for Railway's free tier, including connection pooling, pagination, and memory-efficient configurations.
 
 ### Main Endpoints
 
+- **Authentication**:
+  - `POST /auth/register`: Register a new user.
+  - `POST /auth/login`: Login and get JWT token.
+
 - **Categories**:
   - `POST /categories`: Create a new category.
-  - `GET /categories`: List all categories.
+  - `GET /categories`: List all user categories.
   - `GET /categories/{id}`: Get a specific category.
   - `PATCH /categories/{id}`: Update a category.
   - `DELETE /categories/{id}`: Delete a category.
 
 - **Expenses**:
   - `POST /expenses`: Add a new expense.
-  - `GET /expenses`: Search expenses (with filters by category, date).
-  - `GET /categories/{category_id}/expenses`: List expenses for a category.
+  - `GET /expenses`: Search expenses (with filters by category, date, pagination).
+  - `GET /categories/{category_id}/expenses`: List expenses for a category (paginated).
   - `PATCH /expenses/{id}`: Update an expense.
   - `DELETE /expenses/{id}`: Delete an expense.
 
@@ -121,13 +136,76 @@ Open `http://localhost:3000` in your browser (Next.js default port).
 
 - **Database**: The `expense.db` and `expense_backup.db` files are used for persistence.
 
-## Next Steps and Improvements
+## Railway Deployment (Free Tier Optimized)
 
-- **Authentication**: Add login/logout system with JWT.
-- **Visualizations**: Integration of libraries like Chart.js for advanced charts.
-- **Notifications**: Alerts for budget overruns.
-- **Optimizations**: Migration to PostgreSQL for production, add caching (Redis).
-- **Deployment**: Docker scripts to facilitate deployment.
+This backend is optimized for deployment on [Railway](https://railway.app) using their free tier (512 MB RAM, 1 GB storage).
+
+### Railway Configuration Files
+
+The project includes optimized configuration for Railway deployment:
+
+- **`runtime.txt`**: Specifies Python 3.11
+- **`Procfile`**: Defines the web process using the optimized startup script
+- **`start.sh`**: Custom startup script with performance optimizations
+- **`.env.example`**: Template for required environment variables
+
+### Environment Variables for Railway
+
+Set these variables in your Railway project settings:
+
+```bash
+ENVIRONMENT=production
+SECRET_KEY=your-secure-secret-key-here
+DATABASE_URL=sqlite+aiosqlite:///./expense.db
+FRONTEND_URL=https://your-frontend-domain.com
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+### Deployment Steps
+
+1. **Generate a secure SECRET_KEY**:
+   ```bash
+   python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_urlsafe(32))"
+   ```
+
+2. **Set environment variables** in Railway dashboard
+
+3. **Deploy**:
+   ```bash
+   railway up
+   ```
+
+### Performance Optimizations Applied
+
+- **Database**: Optimized connection pooling (pool_size=5, max_overflow=10)
+- **Memory**: Pagination implemented for large datasets (50 items per page)
+- **Security**: Production-ready CORS configuration and secure JWT handling
+- **Timeouts**: 30-second request timeout to prevent hanging connections
+- **Indexes**: Database indexes on frequently queried fields
+- **Workers**: Single worker configuration for free tier memory limits
+
+### Production Features
+
+- **CORS**: Restricted to specific frontend domains in production
+- **Documentation**: API docs hidden in production for security
+- **Logging**: Reduced logging level for better performance
+- **Error Handling**: Proper error responses and timeouts
+
+## Recent Updates and Improvements
+
+✅ **Authentication System**: JWT-based login/logout fully implemented with secure token handling
+✅ **Railway Optimization**: Complete optimization for free tier deployment (512 MB RAM, 1 GB storage)
+✅ **Performance Enhancements**: Database indexes, pagination, connection pooling, and memory optimizations
+✅ **Production Security**: Environment-based configuration, CORS restrictions, and secure defaults
+
+## Future Enhancements
+
+- **Visualizations**: Integration of Chart.js or similar for advanced data visualization
+- **Notifications**: Budget alerts and expense notifications system
+- **Advanced Caching**: Redis integration for high-traffic scenarios
+- **Monitoring Dashboard**: Integration with Railway's monitoring tools
+- **API Rate Limiting**: Request throttling for enhanced security
+- **Multi-language Support**: Internationalization for broader user base
 
 ## Author and License
 

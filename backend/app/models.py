@@ -4,10 +4,33 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, func, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
+
+
+class User(Base):
+    """User account for authentication."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relations avec les données existantes
+    categories: Mapped[list["Category"]] = relationship(
+        "Category", back_populates="user", cascade="all, delete-orphan"
+    )
+    expenses: Mapped[list["Expense"]] = relationship(
+        "Expense", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Category(Base):
@@ -16,11 +39,12 @@ class Category(Base):
     __tablename__ = "categories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     parent_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), nullable=True
     )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
 
     expenses: Mapped[list[Expense]] = relationship(
         "Expense", back_populates="category", cascade="all, delete-orphan", lazy="selectin"
@@ -37,6 +61,11 @@ class Category(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
         single_parent=True,
+    )
+    user: Mapped[User] = relationship("User", back_populates="categories")
+
+    __table_args__ = (
+        Index('idx_categories_user_name', 'user_id', 'name'),
     )
 
     @property
@@ -74,8 +103,15 @@ class Expense(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
 
     category: Mapped[Category] = relationship(
         "Category", back_populates="expenses", lazy="selectin"
+    )
+    user: Mapped[User] = relationship("User", back_populates="expenses")
+
+    __table_args__ = (
+        Index('idx_expenses_user_created', 'user_id', 'created_at'),
+        Index('idx_expenses_category_user', 'category_id', 'user_id'),
     )
 

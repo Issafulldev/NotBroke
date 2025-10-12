@@ -10,7 +10,17 @@ from sqlalchemy.orm import declarative_base
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./expense.db")
 
 
-engine = create_async_engine(DATABASE_URL, echo=False, future=True)
+# Optimisations pour Railway et production
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,  # Désactiver les logs SQL en production
+    future=True,
+    pool_size=5,  # Limiter la taille du pool pour économiser la mémoire
+    max_overflow=10,  # Nombre maximum de connexions supplémentaires
+    pool_pre_ping=True,  # Vérifier les connexions avant utilisation
+    pool_recycle=300,  # Recycler les connexions après 5 minutes
+    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+)
 
 AsyncSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
 
