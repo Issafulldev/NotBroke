@@ -12,7 +12,7 @@ A modern full-stack application for managing your expense categories, adding tra
 
 # Ou manuellement :
 cd backend && source venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-cd frontend && npm run dev
+cd frontend && bun run dev
 ```
 
 **URLs de développement:**
@@ -51,7 +51,7 @@ cd frontend && npm run dev
 
 - Python 3.11+ (recommended: use `uv` or `pyenv` for version management).
 - Node.js 18+ (LTS recommended).
-- npm or yarn (installed with Node.js).
+- Bun, npm or yarn (Bun recommended for better performance).
 
 ## Backend
 
@@ -115,7 +115,7 @@ The API will be accessible at `http://127.0.0.1:8000` (development) or your Rail
 
 ```bash
 cd frontend
-npm install
+bun install
 ```
 
 ### Configuration
@@ -132,7 +132,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ```bash
 cd frontend
-npm run dev
+bun run dev
 ```
 
 Open `http://localhost:3000` in your browser (Next.js default port).
@@ -158,7 +158,7 @@ Open `http://localhost:3000` in your browser (Next.js default port).
 
 - **Linting**:
   - Backend: Use `flake8` or `black` if configured (no specific script in the current project).
-  - Frontend: `npm run lint` (ESLint configured).
+  - Frontend: `bun run lint` (ESLint configured).
 
 - **Testing**:
   - Backend: No tests currently defined; recommend `pytest` for unit tests.
@@ -171,7 +171,7 @@ Open `http://localhost:3000` in your browser (Next.js default port).
 ### **Configuration Requise**
 
 - **Python 3.11+** avec environnement virtuel
-- **Node.js 18+** et npm
+- **Node.js 18+** and Bun (recommended)
 - **Git** pour le contrôle de version
 
 ### **Installation et Configuration**
@@ -196,10 +196,10 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 cd frontend
 
 # Installer les dépendances
-npm install
+bun install
 
 # Lancer le serveur de développement
-npm run dev
+bun run dev
 ```
 
 ### **Variables d'Environnement Locales**
@@ -228,7 +228,7 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 cd backend && source venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # Terminal 2: Frontend
-cd frontend && npm run dev
+cd frontend && bun run dev
 ```
 
 ### **Identifiants de Développement**
