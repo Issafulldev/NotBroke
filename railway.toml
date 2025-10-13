@@ -1,0 +1,16 @@
+[build]
+# Configuration pour déploiement automatique depuis Railway
+# Ce projet contient deux services : backend (Python/FastAPI) et frontend (Next.js)
+
+[deploy]
+# Railway détectera automatiquement les services séparés
+# Aucun script de démarrage unique à la racine nécessaire
+
+[services.backend]
+source = "backend"
+buildCommand = "pip install -r requirements.txt"
+
+[services.frontend]
+source = "frontend"
+buildCommand = "bun install && bun run build"
+startCommand = "bun run start"
