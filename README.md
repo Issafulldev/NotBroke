@@ -2,6 +2,36 @@
 
 A modern full-stack application for managing your expense categories, adding transactions, and getting detailed summaries. It includes a robust FastAPI backend and an interactive Next.js frontend.
 
+## 🚀 Quick Start - Development & Production
+
+### **Option 1: Développement Local (Recommandé pour commencer)**
+
+```bash
+# Démarrage rapide (tout en un)
+./start-local.sh
+
+# Ou manuellement :
+cd backend && source venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cd frontend && npm run dev
+```
+
+**URLs de développement:**
+- Frontend: `http://localhost:3000`
+- Backend API: `http://127.0.0.1:8000`
+- Documentation: `http://127.0.0.1:8000/docs`
+
+### **Option 2: Déploiement Production**
+
+1. **Fork/Clone this repository** to your GitHub account
+2. **Link to Railway** for backend deployment (automatic on push)
+3. **Link to Netlify** for frontend deployment (automatic on push)
+4. **Set environment variables** on both platforms (see sections below)
+5. **Push to main branch** - everything deploys automatically!
+
+**URLs de production:**
+- Frontend: `https://your-site.netlify.app`
+- Backend: `https://your-backend.railway.app`
+
 ## Main Features
 
 - **Category Management**: Create, edit, delete and organize categories hierarchically (sub-categories supported).
@@ -136,7 +166,129 @@ Open `http://localhost:3000` in your browser (Next.js default port).
 
 - **Database**: The `expense.db` and `expense_backup.db` files are used for persistence.
 
-## Railway Deployment (Free Tier Optimized)
+## 💻 Développement Local
+
+### **Configuration Requise**
+
+- **Python 3.11+** avec environnement virtuel
+- **Node.js 18+** et npm
+- **Git** pour le contrôle de version
+
+### **Installation et Configuration**
+
+#### **Backend Setup**
+```bash
+cd backend
+
+# Créer et activer l'environnement virtuel
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Installer les dépendances
+pip install -r requirements.txt
+
+# Lancer le serveur
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+#### **Frontend Setup**
+```bash
+cd frontend
+
+# Installer les dépendances
+npm install
+
+# Lancer le serveur de développement
+npm run dev
+```
+
+### **Variables d'Environnement Locales**
+
+#### **Backend (.env)**
+```bash
+ENVIRONMENT=development
+SECRET_KEY=dev-secret-key-change-in-production
+DATABASE_URL=sqlite+aiosqlite:///./expense.db
+FRONTEND_URL=http://localhost:3000
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+#### **Frontend (.env.local)**
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```
+
+### **Démarrage Rapide**
+```bash
+# Utiliser le script automatique
+./start-local.sh
+
+# Ou démarrer manuellement
+# Terminal 1: Backend
+cd backend && source venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2: Frontend
+cd frontend && npm run dev
+```
+
+### **Identifiants de Développement**
+- **Username**: `admin`
+- **Password**: `admin123`
+
+### **Tests Locaux**
+1. **Backend**: `http://127.0.0.1:8000/docs`
+2. **Frontend**: `http://localhost:3000`
+3. **Connexion**: Utilisez les identifiants ci-dessus
+
+### **Dépannage Développement Local**
+
+#### **Problème: "Address already in use"**
+```bash
+# Trouver le processus
+lsof -ti:8000
+# Tuer le processus
+kill -9 PID_NUMBER
+```
+
+#### **Problème: "Module not found"**
+```bash
+cd backend
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+#### **Problème: Frontend ne se connecte pas**
+- Vérifiez que le backend tourne sur le port 8000
+- Vérifiez le fichier `.env.local` du frontend
+- Redémarrez les deux serveurs
+
+#### **Problème: Utilisateur admin non trouvé**
+```bash
+cd /Users/Issa/NotBroke
+python3 migration_script.py
+```
+
+## 🔧 Environment Variables Setup
+
+### Railway (Backend) Variables
+Set these in your Railway project dashboard:
+
+```bash
+ENVIRONMENT=production
+SECRET_KEY=your-secure-secret-key-here
+DATABASE_URL=sqlite+aiosqlite:///./expense.db
+FRONTEND_URL=https://your-netlify-site.netlify.app
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+### Netlify (Frontend) Variables
+Set these in your Netlify site dashboard:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=https://your-railway-backend.railway.app
+```
+
+## 🚂 Railway Deployment (Free Tier Optimized)
 
 This backend is optimized for deployment on [Railway](https://railway.app) using their free tier (512 MB RAM, 1 GB storage).
 
@@ -206,6 +358,23 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 - **Monitoring Dashboard**: Integration with Railway's monitoring tools
 - **API Rate Limiting**: Request throttling for enhanced security
 - **Multi-language Support**: Internationalization for broader user base
+
+## 🎯 Post-Deployment Checklist
+
+After successful deployment:
+
+1. **Test Authentication**: Register/login on your frontend
+2. **Test CRUD Operations**: Create categories and expenses
+3. **Test API Communication**: Verify frontend-backend communication
+4. **Check CORS**: Ensure no CORS errors
+5. **Monitor Performance**: Check Railway and Netlify dashboards
+6. **Update DNS** (optional): Point custom domain if needed
+
+## 📊 Production Monitoring
+
+- **Railway Dashboard**: Monitor CPU, RAM, and database usage
+- **Netlify Dashboard**: Check build logs and analytics
+- **Error Tracking**: Set up error monitoring (e.g., Sentry) for production
 
 ## Author and License
 
