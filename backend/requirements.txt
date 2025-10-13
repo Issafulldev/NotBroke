@@ -8,5 +8,7 @@ passlib[bcrypt]==1.7.4
 python-multipart==0.0.6
 pydantic==2.11.9
 python-dotenv==1.1.1
+# Export functionality
+openpyxl==3.1.2
 # Optimisations pour Railway et production
 gunicorn==21.2.0
