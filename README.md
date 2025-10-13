@@ -23,13 +23,12 @@ cd frontend && bun run dev
 ### **Option 2: Déploiement Production**
 
 1. **Fork/Clone this repository** to your GitHub account
-2. **Link to Railway** for backend deployment (automatic on push)
-3. **Link to Netlify** for frontend deployment (automatic on push)
-4. **Set environment variables** on both platforms (see sections below)
-5. **Push to main branch** - everything deploys automatically!
+2. **Link to Railway** for both backend and frontend deployment (automatic on push)
+3. **Set environment variables** on Railway (see sections below)
+4. **Push to main branch** - everything deploys automatically!
 
 **URLs de production:**
-- Frontend: `https://your-site.netlify.app`
+- Frontend: `https://your-frontend.railway.app`
 - Backend: `https://your-backend.railway.app`
 
 ## Main Features
@@ -281,25 +280,32 @@ FRONTEND_URL=https://your-netlify-site.netlify.app
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
-### Netlify (Frontend) Variables
-Set these in your Netlify site dashboard:
+### Railway (Frontend) Variables
+Set these in your Railway frontend service dashboard:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=https://your-railway-backend.railway.app
+NEXT_PUBLIC_API_BASE_URL=https://your-backend-service-name.railway.app
+NODE_ENV=production
 ```
 
 ## 🚂 Railway Deployment (Free Tier Optimized)
 
-This backend is optimized for deployment on [Railway](https://railway.app) using their free tier (512 MB RAM, 1 GB storage).
+Both backend and frontend are optimized for deployment on [Railway](https://railway.app) using their free tier (512 MB RAM, 1 GB storage per service).
 
 ### Railway Configuration Files
 
 The project includes optimized configuration for Railway deployment:
 
+**Backend:**
 - **`runtime.txt`**: Specifies Python 3.11
 - **`Procfile`**: Defines the web process using the optimized startup script
 - **`start.sh`**: Custom startup script with performance optimizations
-- **`.env.example`**: Template for required environment variables
+
+**Frontend:**
+- **`runtime.txt`**: Specifies Node.js 18.x (compatible with Bun)
+- **`Procfile`**: Defines the web process for Next.js
+- **`start.sh`**: Optimized startup script for Next.js with Bun
+- **`railway.toml`**: Railway-specific configuration for optimal deployment
 
 ### Environment Variables for Railway
 
@@ -315,17 +321,54 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 ### Deployment Steps
 
+#### Backend Deployment
 1. **Generate a secure SECRET_KEY**:
    ```bash
    python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_urlsafe(32))"
    ```
 
-2. **Set environment variables** in Railway dashboard
+2. **Set environment variables** in Railway backend service dashboard:
+   ```bash
+   ENVIRONMENT=production
+   SECRET_KEY=your-generated-secret-key-here
+   DATABASE_URL=sqlite+aiosqlite:///./expense.db
+   FRONTEND_URL=https://your-frontend-service.railway.app
+   ACCESS_TOKEN_EXPIRE_MINUTES=30
+   ```
 
-3. **Deploy**:
+3. **Deploy backend**:
    ```bash
    railway up
    ```
+
+#### Frontend Deployment
+1. **Add frontend service** to your Railway project:
+   ```bash
+   railway add --name frontend
+   ```
+
+2. **Set environment variables** in Railway frontend service dashboard:
+   ```bash
+   NEXT_PUBLIC_API_BASE_URL=https://your-backend-service-name.railway.app
+   NODE_ENV=production
+   ```
+
+3. **Deploy frontend**:
+   ```bash
+   railway up
+   ```
+
+#### Complete Deployment (Both Services)
+```bash
+# Deploy everything at once
+railway up
+
+# Check status of all services
+railway status
+
+# View logs
+railway logs
+```
 
 ### Performance Optimizations Applied
 
@@ -361,20 +404,22 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 ## 🎯 Post-Deployment Checklist
 
-After successful deployment:
+After successful deployment on Railway:
 
 1. **Test Authentication**: Register/login on your frontend
 2. **Test CRUD Operations**: Create categories and expenses
-3. **Test API Communication**: Verify frontend-backend communication
-4. **Check CORS**: Ensure no CORS errors
-5. **Monitor Performance**: Check Railway and Netlify dashboards
-6. **Update DNS** (optional): Point custom domain if needed
+3. **Test API Communication**: Verify frontend-backend communication (both services)
+4. **Check CORS**: Ensure no CORS errors between services
+5. **Monitor Performance**: Check Railway dashboard for both services
+6. **Verify URLs**: Both services should be accessible and communicating
+7. **Update DNS** (optional): Point custom domain if needed
 
 ## 📊 Production Monitoring
 
-- **Railway Dashboard**: Monitor CPU, RAM, and database usage
-- **Netlify Dashboard**: Check build logs and analytics
+- **Railway Dashboard**: Monitor CPU, RAM, and usage for both frontend and backend services
+- **Railway Logs**: Access logs for both services via `railway logs` or dashboard
 - **Error Tracking**: Set up error monitoring (e.g., Sentry) for production
+- **Service Status**: Use `railway status` to check both services
 
 ## Author and License
 
