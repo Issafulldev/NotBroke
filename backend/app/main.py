@@ -29,7 +29,7 @@ if ENVIRONMENT == "production":
     # En production, restreindre les origines autorisées
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["https://your-frontend-domain.com"],  # À remplacer par votre domaine frontend
+        allow_origins=["https://notbroke-frontend.onrender.com"],  # URL du frontend sur Render
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["*"],
