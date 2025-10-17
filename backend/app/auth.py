@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 
@@ -73,10 +73,11 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     session = Depends(get_session),
 ) -> models.User:
-    """Get the current authenticated user from JWT token."""
+    """Get the current authenticated user from JWT token (cookies or header)."""
     from . import crud
 
     credentials_exception = HTTPException(
@@ -85,8 +86,20 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+    token = None
+
+    # Essayer d'abord de récupérer le token depuis les cookies httpOnly
+    token = request.cookies.get("access_token")
+
+    # Si pas de token dans les cookies, essayer le header Authorization
+    if not token and credentials:
+        token = credentials.credentials
+
+    if not token:
+        raise credentials_exception
+
     try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -102,17 +115,27 @@ async def get_current_user(
 
 # Dependency for optional authentication (returns None if not authenticated)
 async def get_current_user_optional(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     session = Depends(get_session),
 ) -> models.User | None:
     """Get the current authenticated user, or None if not authenticated."""
     from . import crud
 
-    if credentials is None:
+    token = None
+
+    # Essayer d'abord de récupérer le token depuis les cookies httpOnly
+    token = request.cookies.get("access_token")
+
+    # Si pas de token dans les cookies, essayer le header Authorization
+    if not token and credentials:
+        token = credentials.credentials
+
+    if not token:
         return None
 
     try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             return None

@@ -84,7 +84,11 @@ async def register(user: schemas.UserCreate, session=Depends(get_session)):
 
 
 @app.post("/auth/login", response_model=schemas.Token)
-async def login(user_credentials: schemas.UserLogin, session=Depends(get_session)):
+async def login(
+    user_credentials: schemas.UserLogin,
+    response: Response,
+    session=Depends(get_session)
+):
     user = await crud.get_user_by_username(session, user_credentials.username)
     if not user or not verify_password(user_credentials.password, user.hashed_password):
         raise HTTPException(
@@ -94,7 +98,30 @@ async def login(user_credentials: schemas.UserLogin, session=Depends(get_session
         )
 
     access_token = create_access_token(data={"sub": user.username})
+
+    # Définir le cookie httpOnly avec le token JWT
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=ENVIRONMENT == "production",  # Secure seulement en production
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convertir en secondes
+    )
+
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.post("/auth/logout")
+async def logout(response: Response):
+    """Logout endpoint that clears the httpOnly cookie."""
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        secure=ENVIRONMENT == "production",
+        samesite="lax",
+    )
+    return {"message": "Successfully logged out"}
 
 
 @app.post("/categories", response_model=schemas.CategoryRead, status_code=status.HTTP_201_CREATED)
