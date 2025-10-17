@@ -231,13 +231,12 @@ cd frontend && bun run dev
 ```
 
 ### **Identifiants de Développement**
-- **Username**: `admin`
-- **Password**: `admin123`
+- **Setup**: Créez un compte utilisateur via l'interface d'inscription ou utilisez le script de migration pour initialiser un utilisateur administrateur
 
 ### **Tests Locaux**
 1. **Backend**: `http://127.0.0.1:8000/docs`
 2. **Frontend**: `http://localhost:3000`
-3. **Connexion**: Utilisez les identifiants ci-dessus
+3. **Connexion**: Créez un compte utilisateur via l'interface d'inscription
 
 ### **Dépannage Développement Local**
 

@@ -18,10 +18,10 @@ cd frontend && npm run dev
 
 ### Tests
 ```bash
-# Tester la connexion API
+# Tester la connexion API (remplacez USERNAME et PASSWORD par vos propres identifiants)
 curl -X POST "http://127.0.0.1:8000/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "admin123"}'
+  -d '{"username": "VOTRE_USERNAME", "password": "VOTRE_PASSWORD"}'
 ```
 
 ## URLs Importantes
@@ -30,10 +30,10 @@ curl -X POST "http://127.0.0.1:8000/auth/login" \
 - **Backend Local**: http://127.0.0.1:8000
 - **API Docs**: http://127.0.0.1:8000/docs
 
-## Identifiants
+## Configuration Utilisateur
 
-- **Username**: admin
-- **Password**: admin123
+- **Première connexion**: Utilisez l'interface d'inscription pour créer votre compte administrateur
+- **Migration**: Utilisez `python3 migration_script.py` pour initialiser un utilisateur si nécessaire
 
 ## Déploiement Production
 

@@ -15,8 +15,34 @@ from . import crud, schemas
 from .database import get_session, init_db
 from .auth import create_access_token, get_current_user, verify_password
 
-# Configuration pour la production
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+def validate_cors_settings():
+    """Valider et configurer les paramètres CORS selon l'environnement."""
+    environment = os.getenv("ENVIRONMENT", "development")
+    frontend_url = os.getenv("FRONTEND_URL")
+
+    if environment == "production":
+        if not frontend_url:
+            raise ValueError(
+                "FRONTEND_URL environment variable must be set in production for CORS configuration"
+            )
+        # Validation basique de l'URL
+        if not frontend_url.startswith(('http://', 'https://')):
+            raise ValueError("FRONTEND_URL must be a valid HTTP/HTTPS URL")
+
+        allow_origins = [frontend_url]
+        print(f"🔒 Production CORS: Allowing origin {frontend_url}")
+    else:
+        # Développement: origines permissives avec avertissement
+        allow_origins = ["*"]
+        if not frontend_url:
+            print("⚠️  WARNING: FRONTEND_URL not set. Using permissive CORS for development.")
+        else:
+            print(f"🔓 Development CORS: Allowing all origins (configured for {frontend_url})")
+
+    return environment, allow_origins
+
+# Configuration validée de l'environnement et CORS
+ENVIRONMENT, ALLOWED_ORIGINS = validate_cors_settings()
 
 app = FastAPI(
     title="Expense Tracker API",
@@ -24,25 +50,14 @@ app = FastAPI(
     redoc_url="/redoc" if ENVIRONMENT != "production" else None,
 )
 
-# Configuration CORS optimisée pour la production
-if ENVIRONMENT == "production":
-    # En production, restreindre les origines autorisées
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["https://notbroke-frontend.onrender.com"],  # URL du frontend sur Render
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE"],
-        allow_headers=["*"],
-    )
-else:
-    # En développement, permettre toutes les origines
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# Configuration CORS sécurisée
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_headers=["*"],
+)
 
 # Middleware de timeout pour éviter les requêtes qui traînent
 @app.middleware("http")

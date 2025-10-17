@@ -5,7 +5,9 @@ Ce script doit être exécuté après avoir créé le schéma de base de donnée
 """
 
 import asyncio
+import getpass
 import os
+import re
 import sys
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
@@ -16,6 +18,31 @@ sys.path.append(os.path.dirname(__file__))
 from app.database import Base
 from app import models
 from app.auth import hash_password
+
+
+def get_secure_password():
+    """Demander à l'utilisateur d'entrer un mot de passe sécurisé."""
+    while True:
+        password = getpass.getpass("Entrez un mot de passe sécurisé pour l'utilisateur admin (min 8 caractères): ")
+        if len(password) < 8:
+            print("❌ Le mot de passe doit contenir au moins 8 caractères.")
+            continue
+        if not re.search(r'[A-Z]', password):
+            print("❌ Le mot de passe doit contenir au moins une lettre majuscule.")
+            continue
+        if not re.search(r'[a-z]', password):
+            print("❌ Le mot de passe doit contenir au moins une lettre minuscule.")
+            continue
+        if not re.search(r'\d', password):
+            print("❌ Le mot de passe doit contenir au moins un chiffre.")
+            continue
+
+        confirm_password = getpass.getpass("Confirmez le mot de passe: ")
+        if password != confirm_password:
+            print("❌ Les mots de passe ne correspondent pas.")
+            continue
+
+        return password
 
 
 async def migrate_existing_data():
@@ -40,12 +67,15 @@ async def migrate_existing_data():
                 print("Les données ont déjà été migrées.")
                 return
 
-            # Créer l'utilisateur par défaut
-            print("Création de l'utilisateur par défaut...")
+            # Créer l'utilisateur par défaut avec un mot de passe sécurisé
+            print("Création de l'utilisateur administrateur...")
+            print("⚠️  Veuillez créer un mot de passe sécurisé pour l'utilisateur 'admin'")
+            secure_password = get_secure_password()
+
             default_user = models.User(
                 username="admin",
                 email="admin@example.com",
-                hashed_password=hash_password("admin123"),  # À changer !
+                hashed_password=hash_password(secure_password),
                 is_active=True
             )
             session.add(default_user)
@@ -79,8 +109,9 @@ async def migrate_existing_data():
             print(f"📊 {categories_count} catégories et {expenses_count} dépenses attribuées à l'utilisateur {user_id}")
             print("🔐 Vous pouvez maintenant vous connecter avec:")
             print("   Username: admin")
-            print("   Password: admin123")
-            print("⚠️  N'oubliez pas de changer le mot de passe par défaut !")
+            print("   Email: admin@example.com")
+            print("   Password: [le mot de passe que vous venez de définir]")
+            print("✅ Mot de passe sécurisé créé avec succès !")
 
         except Exception as e:
             session.rollback()

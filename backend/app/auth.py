@@ -15,18 +15,40 @@ from jose import JWTError, jwt
 from . import models
 from .database import get_session
 
-# Sécurisation : générer une clé par défaut sécurisée si pas définie
-SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY:
-    if os.getenv("ENVIRONMENT") == "production":
-        raise ValueError("SECRET_KEY environment variable must be set in production")
-    else:
-        # En développement, générer une clé temporaire (non recommandé pour la production)
-        SECRET_KEY = secrets.token_urlsafe(32)
-        print("WARNING: Using generated SECRET_KEY. Set SECRET_KEY environment variable for production.")
+# Validation sécurisée des variables d'environnement critiques
+def validate_environment():
+    """Valider et configurer les variables d'environnement critiques."""
+    environment = os.getenv("ENVIRONMENT", "development")
 
+    # SECRET_KEY validation
+    secret_key = os.getenv("SECRET_KEY")
+    if not secret_key:
+        if environment == "production":
+            raise ValueError(
+                "SECRET_KEY environment variable must be set in production. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            )
+        else:
+            # En développement seulement, générer une clé temporaire
+            secret_key = secrets.token_urlsafe(32)
+            print("⚠️  WARNING: Using generated SECRET_KEY. This is NOT secure for production!")
+            print("   Set SECRET_KEY environment variable for production use.")
+
+    # ACCESS_TOKEN_EXPIRE_MINUTES validation
+    try:
+        expire_minutes = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+        if expire_minutes < 5:
+            print("⚠️  WARNING: ACCESS_TOKEN_EXPIRE_MINUTES is very low (< 5 minutes)")
+        elif expire_minutes > 1440:  # 24 heures
+            print("⚠️  WARNING: ACCESS_TOKEN_EXPIRE_MINUTES is very high (> 24 hours)")
+    except ValueError:
+        raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES must be a valid integer")
+
+    return secret_key, expire_minutes
+
+# Configuration des variables validées
+SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES = validate_environment()
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 security = HTTPBearer()
 
