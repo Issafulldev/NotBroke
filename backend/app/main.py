@@ -13,7 +13,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 
 from . import crud, schemas
 from .database import get_session, init_db
-from .auth import create_access_token, get_current_user, verify_password
+from .auth import create_access_token, get_current_user, verify_password, ACCESS_TOKEN_EXPIRE_MINUTES
 
 def validate_cors_settings():
     """Valider et configurer les paramètres CORS selon l'environnement."""
