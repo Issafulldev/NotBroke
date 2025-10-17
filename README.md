@@ -23,13 +23,13 @@ cd frontend && bun run dev
 ### **Option 2: Déploiement Production**
 
 1. **Fork/Clone this repository** to your GitHub account
-2. **Link to Railway** for both backend and frontend deployment (automatic on push)
-3. **Set environment variables** on Railway (see sections below)
-4. **Push to main branch** - everything deploys automatically!
+2. **Deploy to your preferred hosting platform** (Heroku, DigitalOcean, AWS, etc.)
+3. **Set environment variables** according to your platform's documentation
+4. **Configure your deployment pipeline**
 
 **URLs de production:**
-- Frontend: `https://your-frontend.railway.app`
-- Backend: `https://your-backend.railway.app`
+- Frontend: `https://your-frontend-domain.com`
+- Backend: `https://your-backend-domain.com`
 
 ## Main Features
 
@@ -41,10 +41,10 @@ cd frontend && bun run dev
 
 ## Architecture Overview
 
-- **Backend**: Asynchronous FastAPI API with SQLAlchemy + SQLite, optimized for Railway's free tier with connection pooling, pagination, JWT authentication, and production-ready configurations.
+- **Backend**: Asynchronous FastAPI API with SQLAlchemy + SQLite, with connection pooling, pagination, JWT authentication, and production-ready configurations.
 - **Frontend**: Next.js application (React 19) with React Query for data management, Zustand for global state, and Tailwind CSS for styling.
-- **Database**: SQLite with performance indexes and optimized for low-memory environments.
-- **Deployment**: Railway-optimized with custom startup scripts and environment-specific configurations.
+- **Database**: SQLite with performance indexes and optimized for various hosting environments.
+- **Deployment**: Configurable for various hosting platforms with custom startup scripts and environment-specific configurations.
 
 ## Prerequisites
 
@@ -74,15 +74,15 @@ source venv/bin/activate
 uvicorn app.main:app --reload
 ```
 
-For production (Railway deployment):
+For production deployment:
 ```bash
-# The application will be automatically started by start.sh
-# which includes performance optimizations for the free tier
+# Configure your production server according to your hosting platform
+# Use the start.sh script or configure your server directly
 ```
 
-The API will be accessible at `http://127.0.0.1:8000` (development) or your Railway domain (production).
+The API will be accessible at `http://127.0.0.1:8000` (development) or your production domain.
 
-**Note**: The backend includes performance optimizations specifically designed for Railway's free tier, including connection pooling, pagination, and memory-efficient configurations.
+**Note**: The backend includes performance optimizations including connection pooling, pagination, and memory-efficient configurations suitable for various hosting environments.
 
 ### Main Endpoints
 
@@ -269,47 +269,8 @@ python3 migration_script.py
 
 ## 🔧 Environment Variables Setup
 
-### Railway (Backend) Variables
-Set these in your Railway project dashboard:
-
-```bash
-ENVIRONMENT=production
-SECRET_KEY=your-secure-secret-key-here
-DATABASE_URL=sqlite+aiosqlite:///./expense.db
-FRONTEND_URL=https://your-netlify-site.netlify.app
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-```
-
-### Railway (Frontend) Variables
-Set these in your Railway frontend service dashboard:
-
-```bash
-NEXT_PUBLIC_API_BASE_URL=https://your-backend-service-name.railway.app
-NODE_ENV=production
-```
-
-## 🚂 Railway Deployment (Free Tier Optimized)
-
-Both backend and frontend are optimized for deployment on [Railway](https://railway.app) using their free tier (512 MB RAM, 1 GB storage per service).
-
-### Railway Configuration Files
-
-The project includes optimized configuration for Railway deployment:
-
-**Backend:**
-- **`runtime.txt`**: Specifies Python 3.11
-- **`Procfile`**: Defines the web process using the optimized startup script
-- **`start.sh`**: Custom startup script with performance optimizations
-
-**Frontend:**
-- **`runtime.txt`**: Specifies Node.js 18.x (compatible with Bun)
-- **`Procfile`**: Defines the web process for Next.js
-- **`start.sh`**: Optimized startup script for Next.js with Bun
-- **`railway.toml`**: Railway-specific configuration for optimal deployment
-
-### Environment Variables for Railway
-
-Set these variables in your Railway project settings:
+### Backend Variables
+Configure these environment variables for your backend deployment:
 
 ```bash
 ENVIRONMENT=production
@@ -319,77 +280,17 @@ FRONTEND_URL=https://your-frontend-domain.com
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
-### Deployment Steps
+### Frontend Variables
+Configure these environment variables for your frontend deployment:
 
-#### Backend Deployment
-1. **Generate a secure SECRET_KEY**:
-   ```bash
-   python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_urlsafe(32))"
-   ```
-
-2. **Set environment variables** in Railway backend service dashboard:
-   ```bash
-   ENVIRONMENT=production
-   SECRET_KEY=your-generated-secret-key-here
-   DATABASE_URL=sqlite+aiosqlite:///./expense.db
-   FRONTEND_URL=https://your-frontend-service.railway.app
-   ACCESS_TOKEN_EXPIRE_MINUTES=30
-   ```
-
-3. **Deploy backend**:
-   ```bash
-   railway up
-   ```
-
-#### Frontend Deployment
-1. **Add frontend service** to your Railway project:
-   ```bash
-   railway add --name frontend
-   ```
-
-2. **Set environment variables** in Railway frontend service dashboard:
-   ```bash
-   NEXT_PUBLIC_API_BASE_URL=https://your-backend-service-name.railway.app
-   NODE_ENV=production
-   ```
-
-3. **Deploy frontend**:
-   ```bash
-   railway up
-   ```
-
-#### Complete Deployment (Both Services)
 ```bash
-# Deploy everything at once
-railway up
-
-# Check status of all services
-railway status
-
-# View logs
-railway logs
+NEXT_PUBLIC_API_BASE_URL=https://your-backend-domain.com
+NODE_ENV=production
 ```
-
-### Performance Optimizations Applied
-
-- **Database**: Optimized connection pooling (pool_size=5, max_overflow=10)
-- **Memory**: Pagination implemented for large datasets (50 items per page)
-- **Security**: Production-ready CORS configuration and secure JWT handling
-- **Timeouts**: 30-second request timeout to prevent hanging connections
-- **Indexes**: Database indexes on frequently queried fields
-- **Workers**: Single worker configuration for free tier memory limits
-
-### Production Features
-
-- **CORS**: Restricted to specific frontend domains in production
-- **Documentation**: API docs hidden in production for security
-- **Logging**: Reduced logging level for better performance
-- **Error Handling**: Proper error responses and timeouts
 
 ## Recent Updates and Improvements
 
 ✅ **Authentication System**: JWT-based login/logout fully implemented with secure token handling
-✅ **Railway Optimization**: Complete optimization for free tier deployment (512 MB RAM, 1 GB storage)
 ✅ **Performance Enhancements**: Database indexes, pagination, connection pooling, and memory optimizations
 ✅ **Production Security**: Environment-based configuration, CORS restrictions, and secure defaults
 
@@ -398,28 +299,28 @@ railway logs
 - **Visualizations**: Integration of Chart.js or similar for advanced data visualization
 - **Notifications**: Budget alerts and expense notifications system
 - **Advanced Caching**: Redis integration for high-traffic scenarios
-- **Monitoring Dashboard**: Integration with Railway's monitoring tools
+- **Monitoring Dashboard**: Integration with monitoring tools
 - **API Rate Limiting**: Request throttling for enhanced security
 - **Multi-language Support**: Internationalization for broader user base
 
 ## 🎯 Post-Deployment Checklist
 
-After successful deployment on Railway:
+After successful deployment:
 
 1. **Test Authentication**: Register/login on your frontend
 2. **Test CRUD Operations**: Create categories and expenses
-3. **Test API Communication**: Verify frontend-backend communication (both services)
+3. **Test API Communication**: Verify frontend-backend communication
 4. **Check CORS**: Ensure no CORS errors between services
-5. **Monitor Performance**: Check Railway dashboard for both services
+5. **Monitor Performance**: Check your hosting platform's monitoring dashboard
 6. **Verify URLs**: Both services should be accessible and communicating
 7. **Update DNS** (optional): Point custom domain if needed
 
 ## 📊 Production Monitoring
 
-- **Railway Dashboard**: Monitor CPU, RAM, and usage for both frontend and backend services
-- **Railway Logs**: Access logs for both services via `railway logs` or dashboard
+- **Hosting Platform Dashboard**: Monitor CPU, RAM, and usage according to your hosting provider
+- **Application Logs**: Access logs through your hosting platform's logging system
 - **Error Tracking**: Set up error monitoring (e.g., Sentry) for production
-- **Service Status**: Use `railway status` to check both services
+- **Service Status**: Monitor service health through your hosting platform's tools
 
 ## Author and License
 

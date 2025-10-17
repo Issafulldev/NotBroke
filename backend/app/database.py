@@ -10,7 +10,7 @@ from sqlalchemy.orm import declarative_base
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./expense.db")
 
 
-# Optimisations pour Railway et production
+# Optimisations pour production
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,  # Désactiver les logs SQL en production

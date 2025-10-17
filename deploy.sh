@@ -35,13 +35,11 @@ fi
 # Commit et push
 echo "📦 Préparation du commit..."
 git add .
-git commit -m "Deploy: Optimize for Railway + Netlify"
+git commit -m "Deploy: Update project"
 
 echo "🚀 Push vers GitHub (déclenche le déploiement automatique)..."
 git push origin main
 
 echo "✅ Déploiement initié!"
-echo "🔍 Surveillez les déploiements sur:"
-echo "   - Railway: https://railway.app"
-echo "   - Netlify: https://netlify.com"
-echo "📝 N'oubliez pas de configurer les variables d'environnement sur les plateformes!"
+echo "🔍 Surveillez le déploiement sur votre plateforme d'hébergement préférée"
+echo "📝 N'oubliez pas de configurer les variables d'environnement!"

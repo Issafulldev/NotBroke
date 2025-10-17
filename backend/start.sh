@@ -1,7 +1,7 @@
 #!/bin/bash
-# Script de démarrage optimisé pour Railway
+# Script de démarrage pour l'application backend
 
-# Optimisations pour Railway
+# Optimisations de performance
 export PYTHONOPTIMIZE=1
 export PYTHONUNBUFFERED=1
 

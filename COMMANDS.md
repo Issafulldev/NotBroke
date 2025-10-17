@@ -48,18 +48,18 @@ git push origin main
 
 ### Variables d'Environnement
 
-#### Railway (Backend)
+#### Backend
 ```
 ENVIRONMENT=production
 SECRET_KEY=votre-cle-secrete
 DATABASE_URL=sqlite+aiosqlite:///./expense.db
-FRONTEND_URL=https://your-netlify-site.netlify.app
+FRONTEND_URL=https://your-frontend-domain.com
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
-#### Netlify (Frontend)
+#### Frontend
 ```
-NEXT_PUBLIC_API_BASE_URL=https://your-railway-backend.railway.app
+NEXT_PUBLIC_API_BASE_URL=https://your-backend-domain.com
 ```
 
 ## Dépannage
