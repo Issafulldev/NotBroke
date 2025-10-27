@@ -50,7 +50,7 @@ def validate_environment():
 SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES = validate_environment()
 ALGORITHM = "HS256"
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)  # 🔐 auto_error=False allows missing Authorization header
 
 
 def hash_password(password: str) -> str:

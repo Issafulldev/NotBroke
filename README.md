@@ -41,10 +41,10 @@ cd frontend && bun run dev
 
 ## Architecture Overview
 
-- **Backend**: Asynchronous FastAPI API with SQLAlchemy + SQLite, with connection pooling, pagination, JWT authentication, and production-ready configurations.
+- **Backend**: Asynchronous FastAPI API with SQLAlchemy + PostgreSQL/SQLite, with connection pooling, pagination, JWT authentication, and production-ready configurations.
 - **Frontend**: Next.js application (React 19) with React Query for data management, Zustand for global state, and Tailwind CSS for styling.
-- **Database**: SQLite with performance indexes and optimized for various hosting environments.
-- **Deployment**: Configurable for various hosting platforms with custom startup scripts and environment-specific configurations.
+- **Database**: PostgreSQL (production recommended) or SQLite (development), with performance indexes and optimized for various hosting environments.
+- **Deployment**: Configurable for various hosting platforms (Render, VPS, Hostinger) with custom startup scripts and environment-specific configurations.
 
 ## Prerequisites
 
@@ -63,7 +63,15 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-> The backend uses SQLite by default via the `DATABASE_URL` variable. You can override it in a `.env` file if needed (e.g.: `DATABASE_URL=sqlite:///./expense.db`).
+> The backend uses SQLite by default via the `DATABASE_URL` variable. You can override it in a `.env` file if needed.
+> 
+> **For production deployments, PostgreSQL is recommended** (more reliable, better concurrency).
+> 
+> Examples:
+> - SQLite: `DATABASE_URL=sqlite+aiosqlite:///./expense.db`
+> - PostgreSQL: `DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/notbroke_db`
+> 
+> See [MIGRATION_POSTGRESQL.md](./MIGRATION_POSTGRESQL.md) for detailed migration instructions.
 
 ### Starting the Server
 

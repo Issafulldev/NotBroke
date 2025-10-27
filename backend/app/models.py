@@ -115,3 +115,18 @@ class Expense(Base):
         Index('idx_expenses_category_user', 'category_id', 'user_id'),
     )
 
+
+class Translation(Base):
+    """Translation strings for internationalization (i18n)."""
+
+    __tablename__ = "translations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    locale: Mapped[str] = mapped_column(String(5), nullable=False)  # 'fr', 'en', 'ru'
+    key: Mapped[str] = mapped_column(String(200), nullable=False)  # e.g., 'auth.login.title'
+    value: Mapped[str] = mapped_column(Text, nullable=False)  # e.g., 'Connexion'
+
+    __table_args__ = (
+        Index('idx_translations_locale_key', 'locale', 'key'),
+    )
+

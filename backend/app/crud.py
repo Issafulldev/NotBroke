@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 import csv
 import io
 from enum import Enum
@@ -117,7 +117,13 @@ async def create_category(session: AsyncSession, category: schemas.CategoryCreat
     return db_category
 
 
-async def list_categories(session: AsyncSession, user_id: int) -> Sequence[models.Category]:
+async def list_categories(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    page: int = 1,
+    per_page: int = 20,
+) -> tuple[list[models.Category], int, bool, bool]:
     result = await session.execute(
         select(models.Category)
         .options(
@@ -128,6 +134,7 @@ async def list_categories(session: AsyncSession, user_id: int) -> Sequence[model
         .order_by(models.Category.name)
     )
     categories = result.scalars().unique().all()
+
     category_map = {category.id: (category.name, category.parent_id) for category in categories}
     for category in categories:
         setattr(
@@ -136,18 +143,18 @@ async def list_categories(session: AsyncSession, user_id: int) -> Sequence[model
             _build_category_path_from_map(category.id, category_map),
         )
 
-    # Retourner un arbre (racines uniquement), avec children peuplés
     id_to_node = {c.id: c for c in categories}
     roots: list[models.Category] = []
     for c in categories:
         if c.parent_id and c.parent_id in id_to_node:
-            # la relation children est déjà chargée via selectinload, mais on s'assure
             parent = id_to_node[c.parent_id]
             if c not in parent.children:
                 parent.children.append(c)
         else:
             roots.append(c)
-    return roots
+
+    total = len(categories)
+    return roots, total, False, False
 
 
 def _build_category_path(category: models.Category) -> str:
@@ -244,7 +251,7 @@ async def list_expenses_by_category(
     end_date: datetime | None = None,
     page: int = 1,
     per_page: int = 50,
-) -> Sequence[models.Expense]:
+) -> tuple[list[models.Expense], int, bool, bool]:
     query = (
         select(models.Expense)
         .options(
@@ -256,13 +263,22 @@ async def list_expenses_by_category(
     if start_date is not None:
         query = query.where(models.Expense.created_at >= start_date)
     if end_date is not None:
-        query = query.where(models.Expense.created_at <= end_date)
+        query = query.where(models.Expense.created_at < end_date + timedelta(days=1))
 
-    # Pagination pour optimiser les performances mémoire
+    count_query = select(func.count()).select_from(models.Expense).where(
+        models.Expense.category_id == category_id,
+        models.Expense.user_id == user_id,
+    )
+
+    if start_date is not None:
+        count_query = count_query.where(models.Expense.created_at >= start_date)
+    if end_date is not None:
+        count_query = count_query.where(models.Expense.created_at < end_date + timedelta(days=1))
+
+    total = await session.scalar(count_query) or 0
+
     offset = (page - 1) * per_page
-    query = query.order_by(models.Expense.created_at.desc()).offset(offset).limit(per_page)
-
-    result = await session.execute(query)
+    result = await session.execute(query.order_by(models.Expense.created_at.desc()).offset(offset).limit(per_page))
     expenses = result.scalars().all()
     category_map = await _load_category_map(session, user_id)
     for expense in expenses:
@@ -271,7 +287,11 @@ async def list_expenses_by_category(
             "category_path",
             _build_category_path_from_map(expense.category_id, category_map),
         )
-    return expenses
+
+    has_next = total > page * per_page
+    has_previous = page > 1
+
+    return expenses, total, has_next, has_previous
 
 
 async def search_expenses(
@@ -283,7 +303,7 @@ async def search_expenses(
     end_date: datetime | None = None,
     page: int = 1,
     per_page: int = 50,
-) -> Sequence[models.Expense]:
+) -> tuple[list[models.Expense], int, bool, bool]:
     query = (
         select(models.Expense)
         .options(
@@ -298,13 +318,20 @@ async def search_expenses(
     if start_date is not None:
         query = query.where(models.Expense.created_at >= start_date)
     if end_date is not None:
-        query = query.where(models.Expense.created_at <= end_date)
+        query = query.where(models.Expense.created_at < end_date + timedelta(days=1))
 
-    # Pagination pour optimiser les performances mémoire
+    count_query = select(func.count()).select_from(models.Expense).where(models.Expense.user_id == user_id)
+    if category_id is not None:
+        count_query = count_query.where(models.Expense.category_id == category_id)
+    if start_date is not None:
+        count_query = count_query.where(models.Expense.created_at >= start_date)
+    if end_date is not None:
+        count_query = count_query.where(models.Expense.created_at < end_date + timedelta(days=1))
+
+    total = await session.scalar(count_query) or 0
+
     offset = (page - 1) * per_page
-    query = query.offset(offset).limit(per_page)
-
-    result = await session.execute(query)
+    result = await session.execute(query.offset(offset).limit(per_page))
     expenses = result.scalars().all()
     category_map = await _load_category_map(session, user_id)
     for expense in expenses:
@@ -313,7 +340,11 @@ async def search_expenses(
             "category_path",
             _build_category_path_from_map(expense.category_id, category_map),
         )
-    return expenses
+
+    has_next = total > page * per_page
+    has_previous = page > 1
+
+    return expenses, total, has_next, has_previous
 
 
 async def get_expense(session: AsyncSession, expense_id: int, user_id: int) -> models.Expense | None:
@@ -395,7 +426,7 @@ async def totals_by_period(
         (
             and_(
                 models.Expense.created_at >= start_date,
-                models.Expense.created_at <= end_date,
+                models.Expense.created_at < end_date + timedelta(days=1),
             ),
             models.Expense.amount,
         ),
@@ -525,4 +556,422 @@ async def export_expenses(
         media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
     return content, media_type, filename
+
+
+async def paginate_query(
+    session: AsyncSession,
+    query,
+    *,
+    page: int,
+    per_page: int,
+) -> tuple[list, int, bool, bool]:
+    total_query = select(func.count()).select_from(query.subquery())
+    total = await session.scalar(total_query)
+
+    offset = (page - 1) * per_page
+    result = await session.execute(query.offset(offset).limit(per_page))
+    items = result.scalars().unique().all()
+
+    has_next = total > page * per_page
+    has_previous = page > 1
+
+    return items, total, has_next, has_previous
+
+
+# ============================================================================
+# TRANSLATIONS (i18n)
+# ============================================================================
+
+async def get_translations_by_locale(session: AsyncSession, locale: str) -> dict[str, str]:
+    """Get all translations for a given locale as a dictionary."""
+    result = await session.execute(
+        select(models.Translation).where(models.Translation.locale == locale)
+    )
+    translations = result.scalars().all()
+    return {t.key: t.value for t in translations}
+
+
+async def create_translation(
+    session: AsyncSession, translation: schemas.TranslationCreate
+) -> models.Translation:
+    """Create a new translation."""
+    db_translation = models.Translation(
+        locale=translation.locale,
+        key=translation.key,
+        value=translation.value,
+    )
+    session.add(db_translation)
+    await session.flush()
+    return db_translation
+
+
+async def upsert_translation(
+    session: AsyncSession, locale: str, key: str, value: str
+) -> models.Translation:
+    """Create or update a translation."""
+    result = await session.execute(
+        select(models.Translation).where(
+            (models.Translation.locale == locale) & (models.Translation.key == key)
+        )
+    )
+    translation = result.scalar_one_or_none()
+
+    if translation:
+        translation.value = value
+    else:
+        translation = models.Translation(locale=locale, key=key, value=value)
+        session.add(translation)
+
+    await session.flush()
+    return translation
+
+
+async def seed_translations(session: AsyncSession) -> None:
+    """Seed the database with default translations."""
+    # Check if translations already exist
+    result = await session.execute(select(func.count(models.Translation.id)))
+    count = result.scalar()
+    if count > 0:
+        return  # Already seeded
+
+    translations_data = [
+        # ========== FRENCH ==========
+        ("fr", "common.appName", "NotBroke"),
+        ("fr", "common.tagline", "Gérez vos dépenses en toute simplicité"),
+        ("fr", "auth.login.title", "Connexion"),
+        ("fr", "auth.login.subtitle", "Connectez-vous à votre compte NotBroke"),
+        ("fr", "auth.login.username", "Nom d'utilisateur"),
+        ("fr", "auth.login.usernamePlaceholder", "Nom d'utilisateur"),
+        ("fr", "auth.login.password", "Mot de passe"),
+        ("fr", "auth.login.passwordPlaceholder", "••••••••"),
+        ("fr", "auth.login.button", "Se connecter"),
+        ("fr", "auth.login.connecting", "Connexion..."),
+        ("fr", "auth.login.noAccount", "Pas encore de compte ?"),
+        ("fr", "auth.login.register", "S'inscrire"),
+        ("fr", "auth.login.errors.invalidCredentials", "Nom d'utilisateur ou mot de passe incorrect"),
+        ("fr", "auth.register.title", "Inscription"),
+        ("fr", "auth.register.subtitle", "Créez votre compte pour commencer"),
+        ("fr", "auth.register.username", "Nom d'utilisateur"),
+        ("fr", "auth.register.usernamePlaceholder", "Nom d'utilisateur"),
+        ("fr", "auth.register.usernameHelp", "3-50 caractères, alphanumériques"),
+        ("fr", "auth.register.email", "Email"),
+        ("fr", "auth.register.emailPlaceholder", "votre@email.com"),
+        ("fr", "auth.register.password", "Mot de passe"),
+        ("fr", "auth.register.passwordPlaceholder", "••••••••"),
+        ("fr", "auth.register.passwordHelp", "Minimum 8 caractères avec majuscule, minuscule, chiffre et caractère spécial"),
+        ("fr", "auth.register.confirmPassword", "Confirmer le mot de passe"),
+        ("fr", "auth.register.confirmPasswordPlaceholder", "••••••••"),
+        ("fr", "auth.register.button", "S'inscrire"),
+        ("fr", "auth.register.registering", "Inscription en cours..."),
+        ("fr", "auth.register.passwordMismatch", "Les mots de passe ne correspondent pas"),
+        ("fr", "auth.register.noAccount", "Vous avez déjà un compte ?"),
+        ("fr", "auth.register.login", "Se connecter"),
+        ("fr", "dashboard.title", "NotBroke"),
+        ("fr", "dashboard.subtitle", "Gérer vos catégories et dépenses"),
+        ("fr", "dashboard.tabs.create", "Création"),
+        ("fr", "dashboard.tabs.search", "Recherche"),
+        ("fr", "dashboard.tabs.export", "Export"),
+        ("fr", "dashboard.hint.export", "Utilisez les mêmes filtres que dans la recherche"),
+        ("fr", "categories.title", "Catégories"),
+        ("fr", "categories.addButton", "Ajouter une catégorie"),
+        ("fr", "categories.editButton", "Éditer"),
+        ("fr", "categories.deleteButton", "Supprimer"),
+        ("fr", "categories.name", "Nom"),
+        ("fr", "categories.description", "Description"),
+        ("fr", "categories.noDescription", "Pas de description"),
+        ("fr", "categories.parent", "Catégorie parente"),
+        ("fr", "categories.cancel", "Annuler"),
+        ("fr", "categories.save", "Enregistrer"),
+        ("fr", "expenses.title", "Dépenses"),
+        ("fr", "expenses.addButton", "Ajouter une dépense"),
+        ("fr", "expenses.editButton", "Éditer une dépense"),
+        ("fr", "expenses.deleteButton", "Supprimer"),
+        ("fr", "expenses.amount", "Montant (€)"),
+        ("fr", "expenses.amountRequired", "Le montant est obligatoire"),
+        ("fr", "expenses.amountPositive", "Le montant doit être positif"),
+        ("fr", "expenses.date", "Date"),
+        ("fr", "expenses.dateRequired", "La date est obligatoire"),
+        ("fr", "expenses.category", "Catégorie"),
+        ("fr", "expenses.categoryPlaceholder", "Sélectionner une catégorie"),
+        ("fr", "expenses.description", "Description"),
+        ("fr", "expenses.descriptionPlaceholder", "Description"),
+        ("fr", "expenses.save", "Enregistrer"),
+        ("fr", "expenses.saving", "Enregistrement..."),
+        ("fr", "expenses.create", "Créer la dépense"),
+        ("fr", "expenses.cancel", "Annuler"),
+        ("fr", "expenses.addSubtitle", "Ajoutez une nouvelle dépense à votre budget"),
+        ("fr", "expenses.editSubtitle", "Modifiez les détails de cette dépense"),
+        ("fr", "expenses.noExpenses", "Aucune dépense"),
+        ("fr", "search.startDate", "Date de début"),
+        ("fr", "search.endDate", "Date de fin"),
+        ("fr", "search.category", "Catégorie"),
+        ("fr", "search.selectCategories", "Sélectionner les catégories"),
+        ("fr", "search.button", "Rechercher"),
+        ("fr", "search.reset", "Réinitialiser"),
+        ("fr", "search.results", "Résultats de la recherche"),
+        ("fr", "search.noResults", "Aucun résultat trouvé"),
+        ("fr", "export.title", "Export des données"),
+        ("fr", "export.format", "Format"),
+        ("fr", "export.csv", "CSV"),
+        ("fr", "export.xlsx", "Excel"),
+        ("fr", "export.startDate", "Date de début"),
+        ("fr", "export.endDate", "Date de fin"),
+        ("fr", "export.category", "Catégorie (optionnel)"),
+        ("fr", "export.button", "Télécharger"),
+        ("fr", "export.selectPeriod", "Veuillez sélectionner une période"),
+        ("fr", "export.invalidDates", "La date de fin doit être postérieure à la date de début"),
+        ("fr", "export.error", "Erreur lors de l'export des données"),
+        ("fr", "summary.title", "Résumé mensuel"),
+        ("fr", "summary.total", "Total"),
+        ("fr", "summary.byCategory", "Par catégorie"),
+        ("fr", "summary.month", "Mois"),
+        ("fr", "summary.noData", "Aucune données"),
+        ("fr", "summary.statistics", "Statistiques"),
+        ("fr", "summary.categoriesUsed", "Catégories utilisées"),
+        ("fr", "summary.averagePerCategory", "Moyenne par catégorie"),
+        ("fr", "summary.percentOfTotal", "du total"),
+        ("fr", "user.login", "Connexion"),
+        ("fr", "user.logout", "Déconnexion"),
+        ("fr", "user.profile", "Profil"),
+        ("fr", "errors.rateLimitRegister", "Trop de tentatives d'inscription. Réessayez plus tard."),
+        ("fr", "errors.rateLimitLogin", "Trop de tentatives de connexion. Réessayez plus tard."),
+        ("fr", "errors.rateLimitGeneral", "Trop de requêtes. Réessayez plus tard."),
+        ("fr", "errors.invalidCredentials", "Nom d'utilisateur ou mot de passe incorrect"),
+        ("fr", "errors.userAlreadyExists", "Cet utilisateur existe déjà"),
+        ("fr", "errors.invalidEmail", "L'adresse email est invalide"),
+        ("fr", "errors.categoryNotFound", "Catégorie non trouvée"),
+        ("fr", "errors.expenseNotFound", "Dépense non trouvée"),
+        ("fr", "errors.couldNotValidateCredentials", "Impossible de valider les identifiants"),
+        ("fr", "errors.invalidLocale", "Locale non valide"),
+        ("fr", "errors.failedFetchTranslations", "Impossible de récupérer les traductions"),
+        ("fr", "errors.validationFailed", "Validation échouée"),
+        
+        # ========== ENGLISH ==========
+        ("en", "common.appName", "NotBroke"),
+        ("en", "common.tagline", "Manage your expenses with ease"),
+        ("en", "auth.login.title", "Login"),
+        ("en", "auth.login.subtitle", "Sign in to your NotBroke account"),
+        ("en", "auth.login.username", "Username"),
+        ("en", "auth.login.usernamePlaceholder", "Username"),
+        ("en", "auth.login.password", "Password"),
+        ("en", "auth.login.passwordPlaceholder", "••••••••"),
+        ("en", "auth.login.button", "Sign in"),
+        ("en", "auth.login.connecting", "Signing in..."),
+        ("en", "auth.login.noAccount", "Don't have an account?"),
+        ("en", "auth.login.register", "Sign up"),
+        ("en", "auth.login.errors.invalidCredentials", "Incorrect username or password"),
+        ("en", "auth.register.title", "Sign up"),
+        ("en", "auth.register.subtitle", "Create your account to get started"),
+        ("en", "auth.register.username", "Username"),
+        ("en", "auth.register.usernamePlaceholder", "Username"),
+        ("en", "auth.register.usernameHelp", "3-50 characters, alphanumeric"),
+        ("en", "auth.register.email", "Email"),
+        ("en", "auth.register.emailPlaceholder", "your@email.com"),
+        ("en", "auth.register.password", "Password"),
+        ("en", "auth.register.passwordPlaceholder", "••••••••"),
+        ("en", "auth.register.passwordHelp", "Minimum 8 characters with uppercase, lowercase, digit and special character"),
+        ("en", "auth.register.confirmPassword", "Confirm password"),
+        ("en", "auth.register.confirmPasswordPlaceholder", "••••••••"),
+        ("en", "auth.register.button", "Sign up"),
+        ("en", "auth.register.registering", "Signing up..."),
+        ("en", "auth.register.passwordMismatch", "Passwords do not match"),
+        ("en", "auth.register.noAccount", "Already have an account?"),
+        ("en", "auth.register.login", "Sign in"),
+        ("en", "dashboard.title", "NotBroke"),
+        ("en", "dashboard.subtitle", "Manage your categories and expenses"),
+        ("en", "dashboard.tabs.create", "Create"),
+        ("en", "dashboard.tabs.search", "Search"),
+        ("en", "dashboard.tabs.export", "Export"),
+        ("en", "dashboard.hint.export", "Use the same filters as in search"),
+        ("en", "categories.title", "Categories"),
+        ("en", "categories.addButton", "Add a category"),
+        ("en", "categories.editButton", "Edit"),
+        ("en", "categories.deleteButton", "Delete"),
+        ("en", "categories.name", "Name"),
+        ("en", "categories.description", "Description"),
+        ("en", "categories.noDescription", "No description"),
+        ("en", "categories.parent", "Parent category"),
+        ("en", "categories.cancel", "Cancel"),
+        ("en", "categories.save", "Save"),
+        ("en", "expenses.title", "Expenses"),
+        ("en", "expenses.addButton", "Add an expense"),
+        ("en", "expenses.editButton", "Edit expense"),
+        ("en", "expenses.deleteButton", "Delete"),
+        ("en", "expenses.amount", "Amount (€)"),
+        ("en", "expenses.amountRequired", "Amount is required"),
+        ("en", "expenses.amountPositive", "Amount must be positive"),
+        ("en", "expenses.date", "Date"),
+        ("en", "expenses.dateRequired", "Date is required"),
+        ("en", "expenses.category", "Category"),
+        ("en", "expenses.categoryPlaceholder", "Select a category"),
+        ("en", "expenses.description", "Description"),
+        ("en", "expenses.descriptionPlaceholder", "Description"),
+        ("en", "expenses.save", "Save"),
+        ("en", "expenses.saving", "Saving..."),
+        ("en", "expenses.create", "Create expense"),
+        ("en", "expenses.cancel", "Cancel"),
+        ("en", "expenses.addSubtitle", "Add a new expense to your budget"),
+        ("en", "expenses.editSubtitle", "Modify this expense details"),
+        ("en", "expenses.noExpenses", "No expenses"),
+        ("en", "search.startDate", "Start date"),
+        ("en", "search.endDate", "End date"),
+        ("en", "search.category", "Category"),
+        ("en", "search.selectCategories", "Select categories"),
+        ("en", "search.button", "Search"),
+        ("en", "search.reset", "Reset"),
+        ("en", "search.results", "Search results"),
+        ("en", "search.noResults", "No results found"),
+        ("en", "export.title", "Export data"),
+        ("en", "export.format", "Format"),
+        ("en", "export.csv", "CSV"),
+        ("en", "export.xlsx", "Excel"),
+        ("en", "export.startDate", "Start date"),
+        ("en", "export.endDate", "End date"),
+        ("en", "export.category", "Category (optional)"),
+        ("en", "export.button", "Download"),
+        ("en", "export.selectPeriod", "Please select a period"),
+        ("en", "export.invalidDates", "End date must be after start date"),
+        ("en", "export.error", "Error exporting data"),
+        ("en", "summary.title", "Monthly summary"),
+        ("en", "summary.total", "Total"),
+        ("en", "summary.byCategory", "By category"),
+        ("en", "summary.month", "Month"),
+        ("en", "summary.noData", "No data"),
+        ("en", "summary.statistics", "Statistics"),
+        ("en", "summary.categoriesUsed", "Categories used"),
+        ("en", "summary.averagePerCategory", "Average per category"),
+        ("en", "summary.percentOfTotal", "of total"),
+        ("en", "user.login", "Login"),
+        ("en", "user.logout", "Logout"),
+        ("en", "user.profile", "Profile"),
+        ("en", "errors.rateLimitRegister", "Too many registration attempts. Please try again later."),
+        ("en", "errors.rateLimitLogin", "Too many login attempts. Please try again later."),
+        ("en", "errors.rateLimitGeneral", "Too many requests. Please try again later."),
+        ("en", "errors.invalidCredentials", "Incorrect username or password"),
+        ("en", "errors.userAlreadyExists", "This user already exists"),
+        ("en", "errors.invalidEmail", "The email address is invalid"),
+        ("en", "errors.categoryNotFound", "Category not found"),
+        ("en", "errors.expenseNotFound", "Expense not found"),
+        ("en", "errors.couldNotValidateCredentials", "Could not validate credentials"),
+        ("en", "errors.invalidLocale", "Invalid locale"),
+        ("en", "errors.failedFetchTranslations", "Failed to fetch translations"),
+        ("en", "errors.validationFailed", "Validation failed"),
+        
+        # ========== RUSSIAN ==========
+        ("ru", "common.appName", "NotBroke"),
+        ("ru", "common.tagline", "Управляйте расходами легко"),
+        ("ru", "auth.login.title", "Вход"),
+        ("ru", "auth.login.subtitle", "Войдите в свой аккаунт NotBroke"),
+        ("ru", "auth.login.username", "Имя пользователя"),
+        ("ru", "auth.login.usernamePlaceholder", "Имя пользователя"),
+        ("ru", "auth.login.password", "Пароль"),
+        ("ru", "auth.login.passwordPlaceholder", "••••••••"),
+        ("ru", "auth.login.button", "Войти"),
+        ("ru", "auth.login.connecting", "Вход..."),
+        ("ru", "auth.login.noAccount", "Нет аккаунта?"),
+        ("ru", "auth.login.register", "Зарегистрироваться"),
+        ("ru", "auth.login.errors.invalidCredentials", "Неверное имя пользователя или пароль"),
+        ("ru", "auth.register.title", "Регистрация"),
+        ("ru", "auth.register.subtitle", "Создайте аккаунт для начала"),
+        ("ru", "auth.register.username", "Имя пользователя"),
+        ("ru", "auth.register.usernamePlaceholder", "Имя пользователя"),
+        ("ru", "auth.register.usernameHelp", "3-50 символов, буквы и цифры"),
+        ("ru", "auth.register.email", "Email"),
+        ("ru", "auth.register.emailPlaceholder", "ваш@email.com"),
+        ("ru", "auth.register.password", "Пароль"),
+        ("ru", "auth.register.passwordPlaceholder", "••••••••"),
+        ("ru", "auth.register.passwordHelp", "Минимум 8 символов с заглавной, строчной буквой, цифрой и спецсимволом"),
+        ("ru", "auth.register.confirmPassword", "Подтверждение пароля"),
+        ("ru", "auth.register.confirmPasswordPlaceholder", "••••••••"),
+        ("ru", "auth.register.button", "Зарегистрироваться"),
+        ("ru", "auth.register.registering", "Регистрация..."),
+        ("ru", "auth.register.passwordMismatch", "Пароли не совпадают"),
+        ("ru", "auth.register.noAccount", "Уже есть аккаунт?"),
+        ("ru", "auth.register.login", "Войти"),
+        ("ru", "dashboard.title", "NotBroke"),
+        ("ru", "dashboard.subtitle", "Управляйте категориями и расходами"),
+        ("ru", "dashboard.tabs.create", "Создание"),
+        ("ru", "dashboard.tabs.search", "Поиск"),
+        ("ru", "dashboard.tabs.export", "Экспорт"),
+        ("ru", "dashboard.hint.export", "Используйте те же фильтры, что и в поиске"),
+        ("ru", "categories.title", "Категории"),
+        ("ru", "categories.addButton", "Добавить категорию"),
+        ("ru", "categories.editButton", "Редактировать"),
+        ("ru", "categories.deleteButton", "Удалить"),
+        ("ru", "categories.name", "Название"),
+        ("ru", "categories.description", "Описание"),
+        ("ru", "categories.noDescription", "Нет описания"),
+        ("ru", "categories.parent", "Родительская категория"),
+        ("ru", "categories.cancel", "Отмена"),
+        ("ru", "categories.save", "Сохранить"),
+        ("ru", "expenses.title", "Расходы"),
+        ("ru", "expenses.addButton", "Добавить расход"),
+        ("ru", "expenses.editButton", "Редактировать расход"),
+        ("ru", "expenses.deleteButton", "Удалить"),
+        ("ru", "expenses.amount", "Сумма (€)"),
+        ("ru", "expenses.amountRequired", "Сумма обязательна"),
+        ("ru", "expenses.amountPositive", "Сумма должна быть положительной"),
+        ("ru", "expenses.date", "Дата"),
+        ("ru", "expenses.dateRequired", "Дата обязательна"),
+        ("ru", "expenses.category", "Категория"),
+        ("ru", "expenses.categoryPlaceholder", "Выберите категорию"),
+        ("ru", "expenses.description", "Описание"),
+        ("ru", "expenses.descriptionPlaceholder", "Описание"),
+        ("ru", "expenses.save", "Сохранить"),
+        ("ru", "expenses.saving", "Сохранение..."),
+        ("ru", "expenses.create", "Создать расход"),
+        ("ru", "expenses.cancel", "Отмена"),
+        ("ru", "expenses.addSubtitle", "Добавьте новый расход в ваш бюджет"),
+        ("ru", "expenses.editSubtitle", "Измените детали этого расхода"),
+        ("ru", "expenses.noExpenses", "Нет расходов"),
+        ("ru", "search.startDate", "Дата начала"),
+        ("ru", "search.endDate", "Дата окончания"),
+        ("ru", "search.category", "Категория"),
+        ("ru", "search.selectCategories", "Выбрать категории"),
+        ("ru", "search.button", "Поиск"),
+        ("ru", "search.reset", "Сброс"),
+        ("ru", "search.results", "Результаты поиска"),
+        ("ru", "search.noResults", "Результаты не найдены"),
+        ("ru", "export.title", "Экспорт данных"),
+        ("ru", "export.format", "Формат"),
+        ("ru", "export.csv", "CSV"),
+        ("ru", "export.xlsx", "Excel"),
+        ("ru", "export.startDate", "Дата начала"),
+        ("ru", "export.endDate", "Дата окончания"),
+        ("ru", "export.category", "Категория (опционально)"),
+        ("ru", "export.button", "Загрузить"),
+        ("ru", "export.selectPeriod", "Пожалуйста, выберите период"),
+        ("ru", "export.invalidDates", "Дата окончания должна быть позже даты начала"),
+        ("ru", "export.error", "Ошибка при экспорте данных"),
+        ("ru", "summary.title", "Ежемесячный отчет"),
+        ("ru", "summary.total", "Итого"),
+        ("ru", "summary.byCategory", "По категориям"),
+        ("ru", "summary.month", "Месяц"),
+        ("ru", "summary.noData", "Нет данных"),
+        ("ru", "summary.statistics", "Статистика"),
+        ("ru", "summary.categoriesUsed", "Используемые категории"),
+        ("ru", "summary.averagePerCategory", "Средняя по категориям"),
+        ("ru", "summary.percentOfTotal", "от всего"),
+        ("ru", "user.login", "Вход"),
+        ("ru", "user.logout", "Выход"),
+        ("ru", "user.profile", "Профиль"),
+        ("ru", "errors.rateLimitRegister", "Слишком много попыток регистрации. Повторите попытку позже."),
+        ("ru", "errors.rateLimitLogin", "Слишком много попыток входа. Повторите попытку позже."),
+        ("ru", "errors.rateLimitGeneral", "Слишком много запросов. Повторите попытку позже."),
+        ("ru", "errors.invalidCredentials", "Неверное имя пользователя или пароль"),
+        ("ru", "errors.userAlreadyExists", "Этот пользователь уже существует"),
+        ("ru", "errors.invalidEmail", "Адрес электронной почты недействителен"),
+        ("ru", "errors.categoryNotFound", "Категория не найдена"),
+        ("ru", "errors.expenseNotFound", "Расход не найден"),
+        ("ru", "errors.couldNotValidateCredentials", "Не удалось проверить учетные данные"),
+        ("ru", "errors.invalidLocale", "Неверная локаль"),
+        ("ru", "errors.failedFetchTranslations", "Не удалось получить переводы"),
+        ("ru", "errors.validationFailed", "Ошибка валидации"),
+    ]
+
+    for locale, key, value in translations_data:
+        db_translation = models.Translation(locale=locale, key=key, value=value)
+        session.add(db_translation)
+
+    await session.flush()
 
