@@ -17,7 +17,7 @@ services:
     runtime: node
     plan: free
     rootDir: ""
-    buildCommand: bash frontend/build.sh
+    buildCommand: bash build-frontend.sh
     startCommand: cd frontend && npm start
     envVars:
       - key: NODE_ENV
