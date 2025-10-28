@@ -484,19 +484,19 @@ async def export_expenses(
 
     # 🆕 NOUVEAU: Ajouter headers CORS pour que le téléchargement fonctionne
     origin = request.headers.get("origin")
-    allow_origin = None
-    if origin and origin in ALLOWED_ORIGINS:
-        allow_origin = origin
-    elif not origin and ALLOWED_ORIGINS:
-        allow_origin = ALLOWED_ORIGINS[0]
+    normalized_origin = origin.rstrip("/") if origin else None
+    normalized_allowed = [o.rstrip("/") for o in ALLOWED_ORIGINS if o != "*"]
 
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',
         "Access-Control-Allow-Credentials": "true",
         "Access-Control-Expose-Headers": "Content-Disposition",
     }
-    if allow_origin:
-        headers["Access-Control-Allow-Origin"] = allow_origin
+
+    if "*" in ALLOWED_ORIGINS:
+        headers["Access-Control-Allow-Origin"] = origin or "*"
+    elif normalized_origin and normalized_origin in normalized_allowed:
+        headers["Access-Control-Allow-Origin"] = origin
 
     return Response(content=content, media_type=media_type, headers=headers)
 
