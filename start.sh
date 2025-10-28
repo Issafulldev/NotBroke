@@ -3,28 +3,37 @@ set -e
 
 echo "🚀 Starting NotBroke Frontend..."
 echo "📁 Current directory: $(pwd)"
+echo "📋 Directory listing:"
+ls -la | head -20
 
-# Check if frontend directory exists
-if [ ! -d "frontend" ]; then
-    echo "❌ Error: frontend directory not found!"
-    echo "📍 Looking in parent directories..."
-    if [ -d "../frontend" ]; then
-        cd ..
-    else
-        echo "❌ Cannot find frontend directory!"
-        exit 1
+# Find the actual root where frontend exists
+FRONTEND_DIR=""
+
+# Try common locations
+if [ -d "./frontend" ] && [ -f "./frontend/package.json" ]; then
+    FRONTEND_DIR="./frontend"
+elif [ -d "../frontend" ] && [ -f "../frontend/package.json" ]; then
+    FRONTEND_DIR="../frontend"
+elif [ -d "../../frontend" ] && [ -f "../../frontend/package.json" ]; then
+    FRONTEND_DIR="../../frontend"
+else
+    # Last resort: find it anywhere
+    FOUND=$(find / -maxdepth 5 -name "package.json" -path "*/frontend/package.json" -type f 2>/dev/null | head -1)
+    if [ -n "$FOUND" ]; then
+        FRONTEND_DIR=$(dirname "$FOUND")
     fi
 fi
 
-echo "✅ Found frontend directory"
-echo "📁 Entering frontend directory..."
-cd frontend
-
-# Check for package.json
-if [ ! -f "package.json" ]; then
-    echo "❌ Error: package.json not found in frontend!"
+if [ -z "$FRONTEND_DIR" ]; then
+    echo "❌ Error: Cannot find frontend directory with package.json!"
     exit 1
 fi
+
+echo "✅ Found frontend at: $FRONTEND_DIR"
+cd "$FRONTEND_DIR"
+
+echo "✅ In directory: $(pwd)"
+ls -la | head -10
 
 # Use PORT from environment or default to 3000
 PORT=${PORT:-3000}
