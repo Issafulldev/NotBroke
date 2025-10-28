@@ -9,6 +9,11 @@ from sqlalchemy.orm import declarative_base
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./expense.db")
 
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+elif DATABASE_URL.startswith("postgresql://") and "+asyncpg" not in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+
 
 # Optimisations pour production
 engine = create_async_engine(
