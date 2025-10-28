@@ -482,7 +482,13 @@ async def export_expenses(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    # 🆕 NOUVEAU: Ajouter headers CORS pour que le téléchargement fonctionne
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Access-Control-Allow-Origin": ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS[0] != "*" else "*",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Expose-Headers": "Content-Disposition",
+    }
     return Response(content=content, media_type=media_type, headers=headers)
 
 
