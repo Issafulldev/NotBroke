@@ -512,7 +512,18 @@ async def get_translations(
     
     try:
         translations = await crud.get_translations_by_locale(session, locale)
-        return schemas.TranslationsResponse(locale=locale, translations=translations)
+        response = JSONResponse(
+            content={"locale": locale, "translations": translations},
+            status_code=200
+        )
+        
+        # 🆕 NOUVEAU: Ajouter des headers de cache HTTP
+        # Cacher pendant 30 jours (2592000 secondes)
+        response.headers["Cache-Control"] = "public, max-age=2592000"
+        # Permettre aussi au navigateur de réutiliser même après expiration si pas de connexion
+        response.headers["Vary"] = "Accept-Encoding"
+        
+        return response
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

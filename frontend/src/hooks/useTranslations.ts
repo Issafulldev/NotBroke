@@ -33,6 +33,17 @@ export function useTranslations(): UseTranslationsReturn {
       setIsLoading(true)
       setError(null)
       try {
+        // 🆕 NOUVEAU: Vérifier le cache localStorage d'abord
+        const cacheKey = `translations_${locale}`
+        const cachedTranslations = localStorage.getItem(cacheKey)
+
+        if (cachedTranslations) {
+          console.log(`[i18n] Chargeant depuis le cache: ${locale}`)
+          setTranslations(JSON.parse(cachedTranslations))
+          setIsLoading(false)
+          return
+        }
+
         console.log(`[i18n] Loading translations for locale: ${locale}`)
         console.log(`[i18n] API URL: ${API_BASE_URL}/translations/${locale}`)
 
@@ -47,8 +58,12 @@ export function useTranslations(): UseTranslationsReturn {
         const data = await response.json()
         console.log(`[i18n] Received translations:`, data)
 
-        setTranslations(data.translations || {})
-        console.log(`[i18n] Translations loaded successfully for ${locale}`)
+        // 🆕 NOUVEAU: Stocker en cache pour la prochaine fois
+        const translationsData = data.translations || {}
+        localStorage.setItem(cacheKey, JSON.stringify(translationsData))
+
+        setTranslations(translationsData)
+        console.log(`[i18n] Translations loaded and cached for ${locale}`)
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error'
         setError(errorMessage)
