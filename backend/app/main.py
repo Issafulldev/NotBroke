@@ -174,7 +174,7 @@ async def login(
         value=access_token,
         httponly=True,
         secure=ENVIRONMENT == "production",
-        samesite="lax",
+        samesite="none" if ENVIRONMENT == "production" else "lax",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
