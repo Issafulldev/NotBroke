@@ -67,6 +67,12 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],  # 🔐 Specific headers instead of wildcard with credentials
 )
 
+
+@app.get("/", include_in_schema=False)
+async def root_healthcheck() -> dict[str, str]:
+    """Simple healthcheck endpoint for Render probes."""
+    return {"status": "ok"}
+
 # Middleware de sécurité - Headers de sécurité
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
