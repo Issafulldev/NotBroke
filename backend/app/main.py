@@ -485,7 +485,7 @@ async def export_expenses(
     # 🆕 NOUVEAU: Ajouter headers CORS pour que le téléchargement fonctionne
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',
-        "Access-Control-Allow-Origin": ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS[0] != "*" else "*",
+        "Access-Control-Allow-Origin": ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS and ALLOWED_ORIGINS[0] != "*" else "*",
         "Access-Control-Allow-Credentials": "true",
         "Access-Control-Expose-Headers": "Content-Disposition",
     }
