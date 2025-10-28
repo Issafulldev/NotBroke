@@ -23,7 +23,7 @@ import sys
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, text, delete
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from app.models import Base, User, Category, Expense, Translation
 
@@ -102,6 +102,22 @@ class MigrationManager:
         except Exception as e:
             print(f"  ❌ Erreur: {e}")
             raise
+    
+    async def cleanup_target_data(self) -> None:
+        """Nettoyer les données existantes dans la base cible."""
+        print("\n🧹 Nettoyage des données existantes...")
+        
+        try:
+            async with self.target_session_maker() as session:
+                # Ordre important: respecter les contraintes de clés étrangères
+                await session.execute(delete(Expense))
+                await session.execute(delete(Translation))
+                await session.execute(delete(Category))
+                await session.execute(delete(User))
+                await session.commit()
+                print("  ✅ Données nettoyées")
+        except Exception as e:
+            print(f"  ℹ️  Aucune donnée à nettoyer (base vide): {e}")
     
     async def migrate_users(self) -> None:
         """Migrer les utilisateurs."""
@@ -296,6 +312,7 @@ async def main() -> None:
         
         # Créer le schéma
         await migration.create_target_schema()
+        await migration.cleanup_target_data() # Nettoyer les données existantes
         
         # Migrer les données
         await migration.migrate_users()
