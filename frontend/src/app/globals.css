@@ -1,0 +1,165 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 142 76% 36%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 142 76% 36%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  body {
+    color: #1e293b;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  }
+
+  .dark body {
+    color: #e5e5e5;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100 dark:bg-[#151515] rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-700 rounded-full hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors;
+  }
+}
+
+@layer components {
+
+  /* Wise-inspired card styles */
+  .wise-card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200;
+    transition: all 0.2s ease;
+  }
+
+  .wise-card:hover {
+    @apply shadow-md;
+    transform: translateY(-1px);
+  }
+
+  /* Wise-inspired button styles */
+  .btn-wise {
+    @apply bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-3 rounded-lg transition-all duration-200;
+    box-shadow: 0 2px 4px rgba(34, 197, 94, 0.2);
+  }
+
+  .btn-wise:hover {
+    box-shadow: 0 4px 8px rgba(34, 197, 94, 0.3);
+    transform: translateY(-1px);
+  }
+
+  .btn-wise-secondary {
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-6 py-3 rounded-lg transition-all duration-200;
+  }
+
+  /* Wise-inspired input styles */
+  .input-wise {
+    @apply bg-white border border-gray-300 rounded-lg px-4 py-3 transition-all duration-200;
+    @apply focus:border-green-500 focus:ring-2 focus:ring-green-100 focus:outline-none;
+  }
+
+  /* Wise-inspired badge styles */
+  .badge-wise {
+    @apply bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full;
+  }
+
+  /* Wise-inspired section headers */
+  .section-header {
+    @apply text-2xl font-bold text-gray-900 mb-6;
+  }
+
+  /* Wise-inspired form groups */
+  .form-group {
+    @apply space-y-2;
+  }
+
+  .form-label {
+    @apply text-sm font-medium text-gray-700;
+  }
+}
+
+@layer utilities {
+  .text-wise-green {
+    color: #22c55e;
+  }
+
+  .bg-wise-green {
+    background-color: #22c55e;
+  }
+
+  .border-wise-green {
+    border-color: #22c55e;
+  }
+
+  .shadow-wise {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  }
+
+  .shadow-wise-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+
+  .notbroke-title {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 800;
+    font-size: 2.5rem;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 2px 4px rgba(34, 197, 94, 0.1);
+    letter-spacing: -0.02em;
+  }
+
+  @media (max-width: 640px) {
+    .notbroke-title {
+      font-size: 2rem;
+    }
+  }
+
+  /* Custom styles for date input calendar icon */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    margin-left: -12px;
+    /* Rapprocher l'icône de 30% vers la gauche */
+    transform: translateX(-30%);
+    opacity: 0.8;
+  }
+
+  /* Firefox fallback (moins précis) */
+  input[type="date"]::-moz-focus-inner {
+    margin-left: -12px;
+  }
+}
