@@ -55,8 +55,9 @@ def validate_cors_settings():
         if not frontend_url.startswith(('http://', 'https://')):
             raise ValueError("FRONTEND_URL must be a valid HTTP/HTTPS URL")
 
-        allow_origins = [frontend_url]
-        print(f"🔒 Production CORS: Allowing origin {frontend_url}")
+        # Support multiple origins (séparées par des virgules)
+        allow_origins = [url.strip() for url in frontend_url.split(',') if url.strip()]
+        print(f"🔒 Production CORS: Allowing origins {', '.join(allow_origins)}")
     else:
         # Développement: utiliser l'URL du frontend ou localhost:3000 par défaut
         # On ne peut pas utiliser "*" avec allow_credentials=True

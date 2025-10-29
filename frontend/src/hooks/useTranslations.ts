@@ -88,8 +88,36 @@ export function useTranslations(): UseTranslationsReturn {
     return translations[key] || key
   }
 
-  const translateError = (errorMessage: string | undefined | null): string => {
+  const translateError = (errorMessage: string | undefined | null | any): string => {
     if (!errorMessage) return 'Une erreur s\'est produite'
+
+    // Convert errorMessage to string if it's not already
+    let errorStr: string
+    if (typeof errorMessage === 'string') {
+      errorStr = errorMessage
+    } else if (errorMessage && typeof errorMessage === 'object') {
+      // Handle Pydantic validation errors or other error objects
+      if (Array.isArray(errorMessage)) {
+        // Array of validation errors
+        errorStr = errorMessage.map((e: any) => {
+          if (typeof e === 'string') return e
+          if (e?.msg) return e.msg
+          if (e?.message) return e.message
+          return JSON.stringify(e)
+        }).join(', ')
+      } else if (errorMessage.detail) {
+        // FastAPI error detail
+        errorStr = typeof errorMessage.detail === 'string' 
+          ? errorMessage.detail 
+          : JSON.stringify(errorMessage.detail)
+      } else if (errorMessage.message) {
+        errorStr = errorMessage.message
+      } else {
+        errorStr = JSON.stringify(errorMessage)
+      }
+    } else {
+      errorStr = String(errorMessage)
+    }
 
     // Map common error messages to translation keys
     const errorMappings: Record<string, string> = {
@@ -113,13 +141,13 @@ export function useTranslations(): UseTranslationsReturn {
 
     // Try to find a matching translation key
     for (const [keyword, translationKey] of Object.entries(errorMappings)) {
-      if (errorMessage.toLowerCase().includes(keyword.toLowerCase())) {
+      if (errorStr.toLowerCase().includes(keyword.toLowerCase())) {
         return t(translationKey)
       }
     }
 
     // If no match found, return the original message
-    return errorMessage
+    return errorStr
   }
 
   return {

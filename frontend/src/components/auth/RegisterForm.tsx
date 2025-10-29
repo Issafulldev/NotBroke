@@ -109,7 +109,7 @@ export function RegisterForm() {
               disabled={isLoading}
               minLength={3}
               maxLength={50}
-              pattern="^[a-zA-Z0-9_-]+$"
+              pattern="[a-zA-Z0-9_-]+"
               title="Alphanumeric characters, underscore and dash only"
               className="h-10 border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
             />
