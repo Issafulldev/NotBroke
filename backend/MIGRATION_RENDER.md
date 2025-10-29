@@ -174,6 +174,72 @@ Assurez-vous que ces variables sont configurées dans Render :
 - `SECRET_KEY` : Clé secrète pour JWT
 - `FRONTEND_URL` : URL de votre frontend
 
+## 🚨 Problème : Erreur 500 sur /categories et /expenses
+
+Si vous rencontrez des erreurs 500 sur les endpoints `/categories` et `/expenses` après le déploiement, c'est probablement que la migration n'a pas été appliquée.
+
+### Solution rapide via Render Shell
+
+1. **Ouvrez le Shell Render** de votre service backend
+2. **Exécutez la migration manuellement** :
+
+```bash
+cd backend  # Si nécessaire
+source venv/bin/activate  # Si nécessaire
+python3 migrate_currency.py
+```
+
+Ou directement avec Alembic :
+
+```bash
+cd backend  # Si nécessaire
+source venv/bin/activate  # Si nécessaire
+alembic upgrade head
+```
+
+### Vérifier les logs Render
+
+Dans le dashboard Render, consultez les logs du service backend. Vous devriez voir :
+
+- ✅ Si la migration a réussi : `✅ Migrations completed successfully`
+- ❌ Si la migration a échoué : `❌ Migration failed! Exit code: X`
+
+### Diagnostic avancé
+
+Si la migration échoue, exécutez ce script de diagnostic dans Render Shell :
+
+```bash
+python3 << 'EOF'
+import asyncio
+from app.database import engine
+from sqlalchemy import text
+
+async def check():
+    async with engine.begin() as conn:
+        # Vérifier si la colonne existe
+        result = await conn.execute(
+            text("SELECT column_name FROM information_schema.columns WHERE table_name='expenses' AND column_name='currency'")
+        )
+        row = result.first()
+        if row:
+            print('✅ Colonne currency existe')
+        else:
+            print('❌ Colonne currency n\'existe pas')
+            print('💡 Exécutez: python3 migrate_currency.py')
+        
+        # Vérifier la version Alembic
+        try:
+            result = await conn.execute(text("SELECT version_num FROM alembic_version"))
+            version = result.first()
+            if version:
+                print(f'📋 Version Alembic actuelle: {version[0]}')
+        except Exception as e:
+            print(f'⚠️  Impossible de lire la version Alembic: {e}')
+
+asyncio.run(check())
+EOF
+```
+
 ## ✅ Après la migration
 
 1. **Vérifiez les logs** du service backend sur Render pour confirmer que les migrations ont réussi

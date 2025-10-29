@@ -17,11 +17,17 @@ fi
 # Exécuter les migrations Alembic avant de démarrer l'application
 echo "🔄 Running database migrations..."
 alembic upgrade head
-if [ $? -ne 0 ]; then
-    echo "❌ Migration failed! Check your database connection and migration files."
-    exit 1
+MIGRATION_STATUS=$?
+if [ $MIGRATION_STATUS -ne 0 ]; then
+    echo "❌ Migration failed! Exit code: $MIGRATION_STATUS"
+    echo "📋 Attempting to diagnose the issue..."
+    echo "💡 You can try running manually: python3 migrate_currency.py"
+    echo "⚠️  Continuing startup anyway - application may fail if migrations are incomplete"
+    # Ne pas arrêter l'app pour permettre le diagnostic manuel
+    # exit 1
+else
+    echo "✅ Migrations completed successfully"
 fi
-echo "✅ Migrations completed successfully"
 
 # Lancer l'application avec des optimisations pour le plan gratuit
 exec uvicorn app.main:app \
