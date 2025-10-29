@@ -230,16 +230,30 @@ class MigrationManager:
             async with self.target_session_maker() as target_session:
                 for translation in source_translations:
                     try:
-                        new_translation = Translation(
-                            id=translation.id,
-                            locale=translation.locale,
-                            key=translation.key,
-                            value=translation.value,
+                        # Vérifier si la traduction existe déjà
+                        existing = await target_session.execute(
+                            __import__("sqlalchemy").select(Translation).where(
+                                Translation.id == translation.id
+                            )
                         )
-                        target_session.add(new_translation)
+                        if existing.scalar():
+                            # Traduction existe, la mettre à jour
+                            existing_trans = existing.scalar()
+                            existing_trans.locale = translation.locale
+                            existing_trans.key = translation.key
+                            existing_trans.value = translation.value
+                        else:
+                            # Nouvelle traduction
+                            new_translation = Translation(
+                                id=translation.id,
+                                locale=translation.locale,
+                                key=translation.key,
+                                value=translation.value,
+                            )
+                            target_session.add(new_translation)
                         self.stats["translations"] += 1
                     except Exception as e:
-                        print(f"    ⚠️  Erreur pour traduction: {e}")
+                        print(f"    ⚠️  Erreur pour traduction id {translation.id}: {e}")
                 
                 await target_session.commit()
                 print(f"  ✅ {self.stats['translations']} traduction(s) migrée(s)")
