@@ -14,6 +14,15 @@ if [ "$ENVIRONMENT" = "production" ] && [ -z "$SECRET_KEY" ]; then
     exit 1
 fi
 
+# Exécuter les migrations Alembic avant de démarrer l'application
+echo "🔄 Running database migrations..."
+alembic upgrade head
+if [ $? -ne 0 ]; then
+    echo "❌ Migration failed! Check your database connection and migration files."
+    exit 1
+fi
+echo "✅ Migrations completed successfully"
+
 # Lancer l'application avec des optimisations pour le plan gratuit
 exec uvicorn app.main:app \
     --host 0.0.0.0 \
