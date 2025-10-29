@@ -19,13 +19,34 @@ from .auth import create_access_token, get_current_user, verify_password, ACCESS
 from .logging_config import log_security_event
 from .cache import get as cache_get, set as cache_set, invalidate as cache_invalidate
 from .rate_limit import check_rate_limit
+from .exceptions import (
+    integrity_error_handler,
+    operational_error_handler,
+    value_error_handler,
+    crud_error_handler,
+    general_exception_handler,
+)
+from .health import get_health_status
+from .config import config
+from sqlalchemy.exc import IntegrityError, OperationalError
+from pydantic import ValidationError
+from fastapi import Query
+
+# Validate environment configuration at startup
+try:
+    # This will raise ValueError if configuration is invalid
+    config
+except ValueError as e:
+    print(f"❌ Configuration Error: {e}")
+    import sys
+    sys.exit(1)
 
 def validate_cors_settings():
     """Valider et configurer les paramètres CORS selon l'environnement."""
-    environment = os.getenv("ENVIRONMENT", "development")
-    frontend_url = os.getenv("FRONTEND_URL")
+    environment = config.environment
+    frontend_url = config.get("FRONTEND_URL")
 
-    if environment == "production":
+    if config.is_production:
         if not frontend_url:
             raise ValueError(
                 "FRONTEND_URL environment variable must be set in production for CORS configuration"
@@ -37,12 +58,16 @@ def validate_cors_settings():
         allow_origins = [frontend_url]
         print(f"🔒 Production CORS: Allowing origin {frontend_url}")
     else:
-        # Développement: origines permissives avec avertissement
-        allow_origins = ["*"]
+        # Développement: utiliser l'URL du frontend ou localhost:3000 par défaut
+        # On ne peut pas utiliser "*" avec allow_credentials=True
         if not frontend_url:
-            print("⚠️  WARNING: FRONTEND_URL not set. Using permissive CORS for development.")
+            frontend_url = "http://localhost:3000"
+            print(f"⚠️  WARNING: FRONTEND_URL not set. Using default: {frontend_url}")
         else:
-            print(f"🔓 Development CORS: Allowing all origins (configured for {frontend_url})")
+            print(f"🔓 Development CORS: Allowing origin {frontend_url}")
+        
+        # Toujours spécifier explicitement l'origine en développement pour permettre credentials
+        allow_origins = [frontend_url]
 
     return environment, allow_origins
 
@@ -51,9 +76,56 @@ ENVIRONMENT, ALLOWED_ORIGINS = validate_cors_settings()
 
 app = FastAPI(
     title="Expense Tracker API",
-    docs_url="/docs" if ENVIRONMENT != "production" else None,
-    redoc_url="/redoc" if ENVIRONMENT != "production" else None,
+    docs_url="/docs" if not config.is_production else None,
+    redoc_url="/redoc" if not config.is_production else None,
+    version="1.0.0",
+    description="""
+    A modern expense management API built with FastAPI.
+    
+    ## Features
+    
+    * **Authentication**: JWT-based authentication with secure httpOnly cookies
+    * **Categories**: Hierarchical category management with parent-child relationships
+    * **Expenses**: Track expenses with amounts, notes, and categorization
+    * **Summaries**: Monthly summaries with totals by category and period
+    * **Export**: Export expenses to CSV or XLSX formats
+    * **Internationalization**: Multi-language support (FR, EN, RU)
+    
+    ## Security
+    
+    * Rate limiting on sensitive endpoints
+    * Input validation with Pydantic
+    * Security headers (CORS, CSP, HSTS)
+    * Audit logging for security events
+    
+    ## Authentication
+    
+    All endpoints except `/auth/register` and `/auth/login` require authentication.
+    Include the JWT token in the Authorization header or use httpOnly cookies.
+    """,
+    terms_of_service="https://example.com/terms/",
+    contact={
+        "name": "NotBroke API Support",
+        "url": "https://example.com/contact/",
+        "email": "support@example.com",
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT",
+    },
 )
+
+# Register exception handlers
+# Note: HTTPException handler must be registered BEFORE other handlers
+# because HTTPException is a subclass of Exception
+from .exceptions import http_exception_handler
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(IntegrityError, integrity_error_handler)
+app.add_exception_handler(OperationalError, operational_error_handler)
+app.add_exception_handler(ValueError, value_error_handler)
+app.add_exception_handler(crud.CategoryNameConflictError, crud_error_handler)
+app.add_exception_handler(crud.UserAlreadyExistsError, crud_error_handler)
+app.add_exception_handler(Exception, general_exception_handler)
 
 # Compression des réponses pour réduire la bande passante
 app.add_middleware(GZipMiddleware, minimum_size=500)
@@ -68,10 +140,21 @@ app.add_middleware(
 )
 
 
+@app.get("/health", response_model=None, tags=["Health"])
+async def health_check(include_details: bool = Query(False, description="Include detailed system information")):
+    """
+    Health check endpoint.
+    
+    Returns the health status of the API and database.
+    Use `?include_details=true` for detailed system information.
+    """
+    return await get_health_status(include_details=include_details)
+
+
 @app.get("/", include_in_schema=False)
 async def root_healthcheck() -> dict[str, str]:
-    """Simple healthcheck endpoint for Render probes."""
-    return {"status": "ok"}
+    """Simple healthcheck endpoint for Render probes (redirects to /health)."""
+    return {"status": "ok", "health_endpoint": "/health"}
 
 # Middleware de sécurité - Headers de sécurité
 @app.middleware("http")
@@ -179,8 +262,8 @@ async def login(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=ENVIRONMENT == "production",
-        samesite="none" if ENVIRONMENT == "production" else "lax",
+        secure=config.is_production,
+        samesite="none" if config.is_production else "lax",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
@@ -194,7 +277,7 @@ async def logout(request: Request, response: Response, current_user=Depends(get_
     response.delete_cookie(
         key="access_token",
         httponly=True,
-        secure=ENVIRONMENT == "production",
+        secure=config.is_production,
         samesite="lax",
     )
     log_security_event("LOGOUT", current_user.id, {"username": current_user.username})
@@ -317,8 +400,6 @@ async def create_expense(
     cache_invalidate(f"expenses:{current_user.id}")
     cache_invalidate(f"summary:{current_user.id}")
     return expense
-    cache_invalidate(f"expenses:{current_user.id}")
-    cache_invalidate(f"summary:{current_user.id}")
 
 
 DateQuery = Annotated[datetime | None, Query(description="Date au format ISO 8601")]
@@ -459,6 +540,26 @@ async def get_summary(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+def get_cors_headers(request: Request) -> dict[str, str]:
+    """Get CORS headers for a request."""
+    origin = request.headers.get("origin")
+    normalized_origin = origin.rstrip("/") if origin else None
+    normalized_allowed = [o.rstrip("/") for o in ALLOWED_ORIGINS]
+
+    headers = {
+        "Access-Control-Allow-Credentials": "true",
+    }
+
+    # Vérifier si l'origine est autorisée
+    if normalized_origin and normalized_origin in normalized_allowed:
+        headers["Access-Control-Allow-Origin"] = origin
+    elif ALLOWED_ORIGINS:
+        # Utiliser la première origine autorisée si l'origine de la requête ne correspond pas
+        headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS[0]
+    
+    return headers
+
+
 @app.get("/expenses/export")
 async def export_expenses(
     request: Request,
@@ -480,23 +581,32 @@ async def export_expenses(
         )
         log_security_event("EXPENSES_EXPORTED", current_user.id, {"format": format})
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        # Ajouter headers CORS même en cas d'erreur
+        cors_headers = get_cors_headers(request)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+            headers=cors_headers
+        ) from exc
+    except Exception as exc:
+        # Catch toutes les autres exceptions et ajouter headers CORS
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error exporting expenses: {exc}", exc_info=True)
+        cors_headers = get_cors_headers(request)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while exporting expenses",
+            headers=cors_headers
+        ) from exc
 
-    # 🆕 NOUVEAU: Ajouter headers CORS pour que le téléchargement fonctionne
-    origin = request.headers.get("origin")
-    normalized_origin = origin.rstrip("/") if origin else None
-    normalized_allowed = [o.rstrip("/") for o in ALLOWED_ORIGINS if o != "*"]
-
+    # Ajouter headers CORS pour que le téléchargement fonctionne
+    cors_headers = get_cors_headers(request)
     headers = {
+        **cors_headers,
         "Content-Disposition": f'attachment; filename="{filename}"',
-        "Access-Control-Allow-Credentials": "true",
         "Access-Control-Expose-Headers": "Content-Disposition",
     }
-
-    if "*" in ALLOWED_ORIGINS:
-        headers["Access-Control-Allow-Origin"] = origin or "*"
-    elif normalized_origin and normalized_origin in normalized_allowed:
-        headers["Access-Control-Allow-Origin"] = origin
 
     return Response(content=content, media_type=media_type, headers=headers)
 

@@ -483,12 +483,16 @@ async def export_expenses(
 ) -> tuple[bytes, str, str]:
     start_date, end_date = _resolve_date_range(start_date, end_date)
 
-    expenses = await search_expenses(
+    # search_expenses retourne un tuple (expenses, total, has_next, has_previous)
+    # On ne prend que la liste des expenses pour l'export
+    expenses, _, _, _ = await search_expenses(
         session,
         user_id=user_id,
         category_id=category_id,
         start_date=start_date,
         end_date=end_date,
+        page=1,
+        per_page=10000,  # Nombre élevé pour récupérer toutes les dépenses
     )
 
     category_map = await _load_category_map(session, user_id)

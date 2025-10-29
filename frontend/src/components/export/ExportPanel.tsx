@@ -78,9 +78,29 @@ export function ExportPanel() {
       link.click()
       link.remove()
       window.URL.revokeObjectURL(url)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur lors de l'export:", error)
-      alert(t('export.error'))
+      
+      // Essayer d'extraire le message d'erreur de la réponse
+      let errorMessage = t('export.error')
+      if (error.response) {
+        // Si la réponse est un Blob, essayer de le lire
+        if (error.response.data instanceof Blob) {
+          try {
+            const text = await error.response.data.text()
+            const errorData = JSON.parse(text)
+            errorMessage = errorData.detail || errorMessage
+          } catch {
+            // Si le parsing échoue, utiliser le message par défaut
+          }
+        } else if (error.response.data?.detail) {
+          errorMessage = error.response.data.detail
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      alert(errorMessage)
     } finally {
       setIsExporting(false)
     }
