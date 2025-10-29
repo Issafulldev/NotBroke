@@ -11,6 +11,8 @@ import { useTranslations } from '@/hooks/useTranslations'
 import { useCategories } from '@/hooks/useCategories'
 import { useExpenses } from '@/hooks/useExpenses'
 import { usePagination } from '@/hooks/usePagination'
+import { ExpenseCardSkeleton } from '@/components/ui/loading-states'
+import { formatCurrency } from '@/lib/utils'
 import { type Category } from '@/lib/api'
 import { useCategoryStore } from '@/lib/store'
 // ExportPanel déplacé dans l'onglet export
@@ -170,18 +172,97 @@ export function SearchPanel({ onFiltersChange, onReset }: SearchPanelProps) {
 
   const hasActiveFilters = filters.start_date || filters.end_date || filters.category_ids.length > 0
 
+  // Filtres rapides prédéfinis
+  const quickFilters = [
+    {
+      label: "Aujourd'hui",
+      getDates: () => {
+        const today = new Date()
+        return {
+          start_date: today.toISOString().split('T')[0],
+          end_date: today.toISOString().split('T')[0]
+        }
+      }
+    },
+    {
+      label: "Cette semaine",
+      getDates: () => {
+        const today = new Date()
+        const startOfWeek = new Date(today)
+        startOfWeek.setDate(today.getDate() - today.getDay())
+        return {
+          start_date: startOfWeek.toISOString().split('T')[0],
+          end_date: today.toISOString().split('T')[0]
+        }
+      }
+    },
+    {
+      label: "Ce mois",
+      getDates: () => {
+        const today = new Date()
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+        return {
+          start_date: startOfMonth.toISOString().split('T')[0],
+          end_date: today.toISOString().split('T')[0]
+        }
+      }
+    },
+    {
+      label: "Mois dernier",
+      getDates: () => {
+        const today = new Date()
+        const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+        const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0)
+        return {
+          start_date: startOfLastMonth.toISOString().split('T')[0],
+          end_date: endOfLastMonth.toISOString().split('T')[0]
+        }
+      }
+    }
+  ]
+
+  const applyQuickFilter = (filter: typeof quickFilters[0]) => {
+    const dates = filter.getDates()
+    const newFilters = {
+      ...filters,
+      start_date: dates.start_date,
+      end_date: dates.end_date
+    }
+    setFilters(newFilters)
+    onFiltersChange(newFilters)
+  }
+
   return (
     <Card className="wise-card">
       <CardHeader className="bg-green-50 rounded-t-xl">
         <CardTitle className="flex items-center gap-3 text-gray-900">
           <div className="p-2 bg-green-100 rounded-lg">
-            <Search className="h-5 w-5 text-green-600" />
+            <Search className="h-5 w-5 text-green-600" aria-hidden="true" />
           </div>
           <span className="text-xl font-semibold">{t('search.results')}</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 p-6">
-        <div className="grid grid-cols-2 gap-6">
+        {/* Filtres rapides */}
+        <div className="space-y-2">
+          <Label className="form-label text-sm font-semibold">Filtres rapides</Label>
+          <div className="flex flex-wrap gap-2">
+            {quickFilters.map((filter) => (
+              <Button
+                key={filter.label}
+                variant="outline"
+                size="sm"
+                onClick={() => applyQuickFilter(filter)}
+                className="text-xs sm:text-sm"
+                aria-label={`Appliquer le filtre ${filter.label}`}
+              >
+                {filter.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           <div className="form-group">
             <Label htmlFor="search_start_date" className="form-label">{t('search.startDate')}</Label>
             <Input
@@ -189,7 +270,8 @@ export function SearchPanel({ onFiltersChange, onReset }: SearchPanelProps) {
               type="date"
               value={filters.start_date}
               onChange={(e) => handleFilterChange('start_date', e.target.value)}
-              className="input-wise"
+              className="input-wise h-10 sm:h-11"
+              aria-label="Date de début de recherche"
             />
           </div>
 
@@ -200,19 +282,40 @@ export function SearchPanel({ onFiltersChange, onReset }: SearchPanelProps) {
               type="date"
               value={filters.end_date}
               onChange={(e) => handleFilterChange('end_date', e.target.value)}
-              className="input-wise"
+              className="input-wise h-10 sm:h-11"
+              aria-label="Date de fin de recherche"
             />
           </div>
         </div>
 
         <div className="form-group">
-          <Label className="form-label">{t('search.category')}</Label>
-          <div className="max-h-56 overflow-y-auto bg-gray-50 rounded-lg p-4 space-y-2">
+          <Label className="form-label" htmlFor="category-filter">{t('search.category')}</Label>
+          <div 
+            id="category-filter"
+            className="max-h-56 overflow-y-auto bg-gray-50 rounded-lg p-4 space-y-2"
+            role="group"
+            aria-label="Sélection de catégories"
+          >
             <div
               className={`flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 cursor-pointer transition-all duration-200 ${filters.category_ids.length === 0 ? 'bg-green-100 border border-green-200' : ''}`}
               onClick={() => handleFilterChange('category_ids', [])}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleFilterChange('category_ids', [])
+                }
+              }}
+              aria-label="Sélectionner toutes les catégories"
             >
-              <input type="checkbox" readOnly checked={filters.category_ids.length === 0} className="w-4 h-4" />
+              <input 
+                type="checkbox" 
+                readOnly 
+                checked={filters.category_ids.length === 0} 
+                className="w-4 h-4" 
+                aria-label="Toutes les catégories"
+              />
               <span className="text-gray-700 font-medium">{t('search.selectCategories')}</span>
             </div>
             {roots.map((cat) => (
@@ -291,7 +394,14 @@ export function SearchPanel({ onFiltersChange, onReset }: SearchPanelProps) {
           {!applied ? (
             <div className="text-sm text-muted-foreground">{t('search.results')}</div>
           ) : expensesQuery.isLoading ? (
-            <div className="text-sm text-muted-foreground">Chargement des résultats...</div>
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground mb-4">Chargement des résultats...</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                  <ExpenseCardSkeleton key={i} />
+                ))}
+              </div>
+            </div>
           ) : expensesQuery.isError ? (
             <div className="text-sm text-destructive">{t('errors.validationFailed')}</div>
           ) : expenses && expenses.length > 0 ? (
@@ -304,16 +414,31 @@ export function SearchPanel({ onFiltersChange, onReset }: SearchPanelProps) {
                 }
                 return selected.has(e.category_id)
               })
-              const total = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+              
+              // Grouper les totaux par devise
+              const totalsByCurrency = filteredExpenses.reduce((acc, expense) => {
+                const currency = expense.currency || 'EUR'
+                acc[currency] = (acc[currency] || 0) + expense.amount
+                return acc
+              }, {} as Record<string, number>)
 
               return (
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center bg-green-50 p-3 rounded-lg border border-green-200">
+                  <div className="flex flex-col gap-2 bg-green-50 p-3 rounded-lg border border-green-200">
                     <div className="text-sm text-muted-foreground">
                       {t('search.results')} ({filteredExpenses.length})
                     </div>
-                    <div className="text-lg font-bold text-green-700">
-                      {t('summary.total')}: {Math.round(total).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
+                    <div className="flex flex-col gap-1">
+                      {Object.entries(totalsByCurrency).map(([currency, total]) => (
+                        <div key={currency} className="text-lg font-bold text-green-700">
+                          {t('summary.total')} ({currency}): {formatCurrency(Math.round(total), currency)}
+                        </div>
+                      ))}
+                      {Object.keys(totalsByCurrency).length > 1 && (
+                        <div className="text-xs text-amber-600 mt-1">
+                          ⚠️ Multiple devises détectées
+                        </div>
+                      )}
                     </div>
                   </div>
                   {meta && (
@@ -339,8 +464,13 @@ export function SearchPanel({ onFiltersChange, onReset }: SearchPanelProps) {
                             {/* Montant centré et proéminent */}
                             <div className="text-center">
                               <div className="font-bold text-lg text-gray-900 break-all">
-                                {Math.round(e.amount).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
+                                {formatCurrency(Math.round(e.amount), e.currency || 'EUR')}
                               </div>
+                              {e.currency && e.currency !== 'EUR' && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {e.currency}
+                                </div>
+                              )}
                             </div>
 
                             {/* Informations secondaires */}

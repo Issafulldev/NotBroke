@@ -39,6 +39,7 @@ export interface Category {
 export interface Expense {
   id: number
   amount: number
+  currency: string  // ISO 4217 code (e.g., 'EUR', 'USD', 'GBP')
   note: string
   category_id: number
   created_at: string

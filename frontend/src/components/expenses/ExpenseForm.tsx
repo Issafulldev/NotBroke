@@ -18,10 +18,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCategories } from '@/hooks/useCategories'
 import { useCategoryStore } from '@/lib/store'
+import { getCurrencySymbol, getDefaultCurrencyByLocale } from '@/lib/utils'
 import { type Expense, type Category } from '@/lib/api'
 
 interface ExpenseFormValues {
   amount: number
+  currency: string
   description: string
   category_id: number
   date: string
@@ -29,20 +31,51 @@ interface ExpenseFormValues {
 
 export interface ExpenseSubmitData {
   amount: number
+  currency: string
   note: string
   category_id: number
   date: string
 }
 
-// Fonction de formatage temporaire pour remplacer formatCurrency
-const formatCurrency = (amount: number) => {
+// Liste des devises supportées avec leurs symboles
+const SUPPORTED_CURRENCIES = [
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
+  { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc' },
+  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
+  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
+  { code: 'NZD', symbol: 'NZ$', name: 'New Zealand Dollar' },
+  { code: 'SEK', symbol: 'kr', name: 'Swedish Krona' },
+  { code: 'NOK', symbol: 'kr', name: 'Norwegian Krone' },
+  { code: 'DKK', symbol: 'kr', name: 'Danish Krone' },
+  { code: 'PLN', symbol: 'zł', name: 'Polish Zloty' },
+  { code: 'CZK', symbol: 'Kč', name: 'Czech Koruna' },
+  { code: 'HUF', symbol: 'Ft', name: 'Hungarian Forint' },
+  { code: 'RUB', symbol: '₽', name: 'Russian Ruble' },
+  { code: 'TRY', symbol: '₺', name: 'Turkish Lira' },
+  { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'BRL', symbol: 'R$', name: 'Brazilian Real' },
+  { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
+  { code: 'MXN', symbol: '$', name: 'Mexican Peso' },
+  { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar' },
+  { code: 'HKD', symbol: 'HK$', name: 'Hong Kong Dollar' },
+  { code: 'KRW', symbol: '₩', name: 'South Korean Won' },
+] as const
+
+// Fonction de formatage avec devise
+const formatCurrency = (amount: number, currency: string = 'EUR') => {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR',
+    currency: currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(amount);
 };
+
+// Le symbole de devise est maintenant importé depuis utils.ts
 
 interface ExpenseFormProps {
   expense?: Expense | null
@@ -54,7 +87,8 @@ interface ExpenseFormProps {
 export function ExpenseForm({ expense, onSubmit, onCancel, isSubmitting }: ExpenseFormProps) {
   const { categoriesQuery } = useCategories()
   const { activeCategoryId } = useCategoryStore()
-  const { t } = useTranslations()
+  const { t, locale } = useTranslations()
+  const defaultCurrency = getDefaultCurrencyByLocale(locale)
 
   const {
     register,
@@ -66,6 +100,7 @@ export function ExpenseForm({ expense, onSubmit, onCancel, isSubmitting }: Expen
   } = useForm<ExpenseFormValues>({
     defaultValues: {
       amount: 0,
+      currency: defaultCurrency,
       description: '',
       category_id: activeCategoryId || 0,
       date: new Date().toISOString().split('T')[0],
@@ -78,6 +113,7 @@ export function ExpenseForm({ expense, onSubmit, onCancel, isSubmitting }: Expen
     if (expense) {
       reset({
         amount: expense.amount,
+        currency: expense.currency || defaultCurrency,
         description: expense.note,
         category_id: expense.category_id,
         date: expense.created_at.split('T')[0],
@@ -85,12 +121,20 @@ export function ExpenseForm({ expense, onSubmit, onCancel, isSubmitting }: Expen
     } else {
       reset({
         amount: 0,
+        currency: defaultCurrency,
         description: '',
         category_id: activeCategoryId || 0,
         date: new Date().toISOString().split('T')[0],
       })
     }
-  }, [expense, activeCategoryId, reset])
+  }, [expense, activeCategoryId, reset, defaultCurrency])
+
+  // Mettre à jour la devise par défaut quand la langue change (seulement si on n'est pas en train d'éditer)
+  useEffect(() => {
+    if (!expense) {
+      setValue('currency', defaultCurrency)
+    }
+  }, [locale, defaultCurrency, expense, setValue])
 
   // Fonction pour construire la hiérarchie des catégories
   const buildCategoryOptions = (categories: Category[]) => {
@@ -115,8 +159,17 @@ export function ExpenseForm({ expense, onSubmit, onCancel, isSubmitting }: Expen
   const categoryOptions = buildCategoryOptions(categories)
 
   const handleFormSubmit = (data: ExpenseFormValues) => {
-    onSubmit(data)
+    onSubmit({
+      amount: data.amount,
+      currency: data.currency,
+      note: data.description,
+      category_id: data.category_id,
+      date: data.date,
+    })
   }
+
+  const selectedCurrency = watch('currency') || 'EUR'
+  const currencySymbol = getCurrencySymbol(selectedCurrency)
 
   return (
     <Card className="modern-card shadow-modern-lg fade-in">
@@ -137,15 +190,15 @@ export function ExpenseForm({ expense, onSubmit, onCancel, isSubmitting }: Expen
       </CardHeader>
       <CardContent className="p-4 lg:p-6">
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6 lg:space-y-8">
-          <div className="grid grid-cols-2 gap-3 lg:gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-8">
             <div className="space-y-2 lg:space-y-4 p-3 lg:p-6 bg-gradient-to-br from-emerald-50 to-green-100 rounded-2xl border border-emerald-200/50 min-h-[120px] flex flex-col">
               <Label htmlFor="amount" className="text-xs lg:text-sm font-semibold text-emerald-700 flex items-center gap-2">
                 <div className="p-1 bg-emerald-200 rounded-md w-6 h-6 flex items-center justify-center">
-                  <span className="text-emerald-600 text-xs lg:text-sm">€</span>
+                  <span className="text-emerald-600 text-xs lg:text-sm">{currencySymbol}</span>
                 </div>
                 {t('expenses.amount')}
               </Label>
-              <div className="flex-1 flex flex-col justify-center">
+              <div className="flex-1 flex flex-col justify-center space-y-3">
                 <div className="relative">
                   <Input
                     id="amount"
@@ -160,6 +213,30 @@ export function ExpenseForm({ expense, onSubmit, onCancel, isSubmitting }: Expen
                       valueAsNumber: true,
                     })}
                   />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="currency" className="text-xs text-emerald-700 whitespace-nowrap">
+                    Devise:
+                  </Label>
+                  <Select
+                    value={selectedCurrency}
+                    onValueChange={(value) => setValue('currency', value)}
+                  >
+                    <SelectTrigger className="h-9 text-sm border-emerald-200 focus:border-emerald-400 flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {SUPPORTED_CURRENCIES.map((currency) => (
+                        <SelectItem key={currency.code} value={currency.code}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{currency.symbol}</span>
+                            <span className="text-xs text-muted-foreground">({currency.code})</span>
+                            <span className="text-xs text-muted-foreground ml-1">{currency.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 {errors.amount && (
                   <p className="text-xs lg:text-sm text-red-600 flex items-center gap-2 mt-2">
@@ -252,7 +329,8 @@ export function ExpenseForm({ expense, onSubmit, onCancel, isSubmitting }: Expen
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="btn-modern flex-1 h-12 lg:h-14 text-sm lg:text-lg font-semibold"
+              className="btn-modern flex-1 h-12 lg:h-14 text-sm lg:text-lg font-semibold min-h-[44px]"
+              aria-label={expense ? 'Enregistrer les modifications' : 'Créer la dépense'}
             >
               {isSubmitting ? (
                 <>
@@ -271,7 +349,8 @@ export function ExpenseForm({ expense, onSubmit, onCancel, isSubmitting }: Expen
                 type="button"
                 variant="outline"
                 onClick={onCancel}
-                className="h-12 lg:h-14 px-4 lg:px-8 text-sm lg:text-lg font-medium border-2 border-gray-300 hover:bg-gray-50 hover:border-gray-400"
+                className="h-12 lg:h-14 px-4 lg:px-8 text-sm lg:text-lg font-medium border-2 border-gray-300 hover:bg-gray-50 hover:border-gray-400 min-h-[44px]"
+                aria-label="Annuler"
               >
                 {t('expenses.cancel')}
               </Button>

@@ -44,6 +44,7 @@ class CategoryRead(CategoryBase):
 
 class ExpenseBase(BaseModel):
     amount: Annotated[float, Field(gt=0, description="Expense amount must be greater than zero")]
+    currency: Annotated[str, Field(default='EUR', min_length=3, max_length=3, description="ISO 4217 currency code (e.g., EUR, USD, GBP)")]
     note: Annotated[str | None, Field(default=None, max_length=500)] = None
     created_at: Annotated[datetime | None, Field(default=None)] = None
 
@@ -55,6 +56,31 @@ class ExpenseBase(BaseModel):
             raise ValueError(msg)
         return value
 
+    @field_validator("currency", mode="before")
+    @classmethod
+    def validate_currency(cls, value: str | None) -> str:  # noqa: D417
+        """Validate ISO 4217 currency code."""
+        # Handle None or empty values (for existing records that might not have currency)
+        if not value or value == '':
+            return 'EUR'
+        
+        # Ensure it's a string and uppercase
+        value_str = str(value).strip().upper()
+        
+        if not value_str.isalpha() or len(value_str) != 3:
+            msg = "Currency must be a valid 3-letter ISO 4217 code (e.g., EUR, USD, GBP)"
+            raise ValueError(msg)
+        # Liste des devises courantes acceptées
+        valid_currencies = {
+            'EUR', 'USD', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 
+            'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RUB', 'TRY',
+            'CNY', 'INR', 'BRL', 'ZAR', 'MXN', 'SGD', 'HKD', 'KRW'
+        }
+        if value_str not in valid_currencies:
+            msg = f"Currency '{value_str}' is not supported. Supported currencies: {', '.join(sorted(valid_currencies))}"
+            raise ValueError(msg)
+        return value_str
+
 
 class ExpenseCreate(ExpenseBase):
     category_id: int
@@ -65,6 +91,7 @@ class ExpenseRead(ExpenseBase):
     category_id: int
     category_path: str | None = None
     created_at: datetime
+    currency: str  # Explicitly include, inherited from ExpenseBase with validation
 
     class Config:
         from_attributes = True
@@ -72,6 +99,7 @@ class ExpenseRead(ExpenseBase):
 
 class ExpenseUpdate(BaseModel):
     amount: Annotated[float | None, Field(default=None, gt=0)] = None
+    currency: Annotated[str | None, Field(default=None, min_length=3, max_length=3)] = None
     note: Annotated[str | None, Field(default=None, max_length=500)] = None
     created_at: Annotated[datetime | None, Field(default=None)] = None
     category_id: int | None = None
@@ -81,6 +109,25 @@ class ExpenseUpdate(BaseModel):
     def validate_amount(cls, value: float | None) -> float | None:  # noqa: D417
         if value is not None and value <= 0:
             msg = "Expense amount must be greater than zero"
+            raise ValueError(msg)
+        return value
+
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, value: str | None) -> str | None:  # noqa: D417
+        """Validate ISO 4217 currency code."""
+        if value is None:
+            return value
+        if not value.isupper() or not value.isalpha() or len(value) != 3:
+            msg = "Currency must be a valid 3-letter ISO 4217 code (e.g., EUR, USD, GBP)"
+            raise ValueError(msg)
+        valid_currencies = {
+            'EUR', 'USD', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 
+            'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RUB', 'TRY',
+            'CNY', 'INR', 'BRL', 'ZAR', 'MXN', 'SGD', 'HKD', 'KRW'
+        }
+        if value not in valid_currencies:
+            msg = f"Currency '{value}' is not supported. Supported currencies: {', '.join(sorted(valid_currencies))}"
             raise ValueError(msg)
         return value
 

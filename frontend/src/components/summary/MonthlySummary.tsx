@@ -1,30 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { TrendingUp, DollarSign, ChevronDown, ChevronRight } from 'lucide-react'
+import { TrendingUp, ChevronDown, ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useTranslations } from '@/hooks/useTranslations'
 import { useMonthlySummary, type SummaryFilters } from '@/hooks/useSummary'
 import { useCategories } from '@/hooks/useCategories'
-import { formatDateOnly } from '@/lib/utils'
+import { formatDateOnly, formatCurrency } from '@/lib/utils'
+import { SummarySkeleton } from '@/components/ui/loading-states'
 import type { Category } from '@/lib/api'
 
 interface MonthlySummaryProps {
   filters?: SummaryFilters
 }
-
-// Fonction de formatage temporaire pour remplacer formatCurrency
-const formatCurrency = (amount: number, locale?: string, options?: Intl.NumberFormatOptions) => {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-    ...options,
-  }).format(amount);
-};
 
 export function MonthlySummary({ filters }: MonthlySummaryProps) {
   const { data: summary, isLoading, isError } = useMonthlySummary(filters)
@@ -115,7 +105,7 @@ export function MonthlySummary({ filters }: MonthlySummaryProps) {
 
           <div className="text-right">
             <span className="font-bold text-lg">
-              {formatCurrency(Math.round(totalAmount))}
+              {formatCurrency(Math.round(totalAmount), 'EUR')}
             </span>
             <div className="text-xs text-muted-foreground">
               {percentage}% {t('summary.percentOfTotal')}
@@ -142,7 +132,7 @@ export function MonthlySummary({ filters }: MonthlySummaryProps) {
                 </div>
                 <div className="text-right">
                   <span className="font-bold text-lg">
-                    {formatCurrency(Math.round(child.amount))}
+                    {formatCurrency(Math.round(child.amount), 'EUR')}
                   </span>
                   <div className="text-xs text-muted-foreground">
                     {((child.amount / summary.total) * 100).toFixed(1)}% {t('summary.percentOfTotal')}
@@ -157,16 +147,7 @@ export function MonthlySummary({ filters }: MonthlySummaryProps) {
   }
 
   if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('summary.title')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center text-muted-foreground">Chargement...</div>
-        </CardContent>
-      </Card>
-    )
+    return <SummarySkeleton />
   }
 
   if (isError) {
@@ -215,18 +196,13 @@ export function MonthlySummary({ filters }: MonthlySummaryProps) {
       <CardContent className="space-y-6">
         {/* Total général */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">
-                {t('summary.total')}
-              </p>
+          <div>
+            <p className="text-sm font-medium text-muted-foreground mb-1">
+              {t('summary.total')}
+            </p>
               <p className="text-3xl font-bold text-blue-900">
-                {formatCurrency(Math.round(summary.total))}
+                {formatCurrency(Math.round(summary.total), 'EUR')}
               </p>
-            </div>
-            <div className="p-3 bg-blue-100 rounded-full">
-              <DollarSign className="h-8 w-8 text-blue-600" />
-            </div>
           </div>
         </div>
 
@@ -267,7 +243,7 @@ export function MonthlySummary({ filters }: MonthlySummaryProps) {
               </div>
               <div className="text-center p-4 rounded-lg bg-gradient-to-br from-purple-50 to-violet-50 border">
                 <div className="text-lg font-bold text-purple-700 mb-1">
-                  {formatCurrency(Math.round(summary.total / Math.max(Object.keys(summary.category_totals).length, 1)))}
+                  {formatCurrency(Math.round(summary.total / Math.max(Object.keys(summary.category_totals).length, 1)), 'EUR')}
                 </div>
                 <div className="text-sm text-purple-600 font-medium">
                   {t('summary.averagePerCategory')}

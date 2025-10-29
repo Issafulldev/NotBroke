@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Download, FileText, FileSpreadsheet } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -38,16 +39,17 @@ export function ExportPanel() {
 
   const handleExport = async () => {
     if (!startDate || !endDate) {
-      alert(t('export.selectPeriod'))
+      toast.error(t('export.selectPeriod') || 'Veuillez sélectionner une période')
       return
     }
 
     if (new Date(startDate) > new Date(endDate)) {
-      alert(t('export.invalidDates'))
+      toast.error(t('export.invalidDates') || 'La date de début doit être antérieure à la date de fin')
       return
     }
 
     setIsExporting(true)
+    const toastId = toast.loading('Préparation de l\'export...')
 
     try {
       const params: ExportParams = {
@@ -78,11 +80,16 @@ export function ExportPanel() {
       link.click()
       link.remove()
       window.URL.revokeObjectURL(url)
+      
+      toast.success('Export réussi !', {
+        id: toastId,
+        description: `Le fichier ${filename} a été téléchargé`
+      })
     } catch (error: any) {
       console.error("Erreur lors de l'export:", error)
       
       // Essayer d'extraire le message d'erreur de la réponse
-      let errorMessage = t('export.error')
+      let errorMessage = t('export.error') || 'Erreur lors de l\'export'
       if (error.response) {
         // Si la réponse est un Blob, essayer de le lire
         if (error.response.data instanceof Blob) {
@@ -100,7 +107,10 @@ export function ExportPanel() {
         errorMessage = error.message
       }
       
-      alert(errorMessage)
+      toast.error('Erreur d\'export', {
+        id: toastId,
+        description: errorMessage
+      })
     } finally {
       setIsExporting(false)
     }

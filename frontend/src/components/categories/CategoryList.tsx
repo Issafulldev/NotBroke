@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronRight, ChevronDown, Edit, Trash2, MoreHorizontal } from 'lucide-react'
+import { ChevronRight, ChevronDown, Edit, Trash2, MoreHorizontal, Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTranslations } from '@/hooks/useTranslations'
@@ -14,6 +14,9 @@ import {
 import { useCategories } from '@/hooks/useCategories'
 import { useCategoryStore } from '@/lib/store'
 import { type Category } from '@/lib/api'
+import { CategoryListSkeleton } from '@/components/ui/loading-states'
+import { Input } from '@/components/ui/input'
+import { toast } from 'sonner'
 import React from 'react'
 
 interface CategoryNodeProps {
@@ -38,6 +41,16 @@ function CategoryNode({ category, level, onSelect, onEdit, onDelete, selectedId 
           }`}
         style={{ marginLeft: `${level * 12}px` }}
         onClick={() => onSelect(category.id)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onSelect(category.id)
+          }
+        }}
+        aria-label={`Sélectionner la catégorie ${category.name}`}
+        aria-expanded={hasChildren ? isExpanded : undefined}
       >
         {hasChildren ? (
           <Button
@@ -48,6 +61,8 @@ function CategoryNode({ category, level, onSelect, onEdit, onDelete, selectedId 
               e.stopPropagation()
               setIsExpanded(!isExpanded)
             }}
+            aria-label={isExpanded ? `Réduire ${category.name}` : `Développer ${category.name}`}
+            aria-expanded={isExpanded}
           >
             {isExpanded ? (
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -85,10 +100,11 @@ function CategoryNode({ category, level, onSelect, onEdit, onDelete, selectedId 
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity min-w-[44px] min-h-[44px]"
               onClick={(e) => e.stopPropagation()}
+              aria-label={`Menu options pour ${category.name}`}
             >
-              <MoreHorizontal className="h-4 w-4" />
+              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
@@ -134,25 +150,62 @@ interface CategoryListProps {
 export function CategoryList({ onEditCategory, showHeader = true }: CategoryListProps) {
   const { categoriesQuery, deleteCategory } = useCategories()
   const { activeCategoryId, setActiveCategoryId } = useCategoryStore()
+  const [searchQuery, setSearchQuery] = useState('')
   const categories = categoriesQuery.data ?? []
-  const roots = categories
+  
+  // Fonction de recherche récursive
+  const filterCategories = (cats: Category[], query: string): Category[] => {
+    if (!query.trim()) return cats
+    
+    const lowerQuery = query.toLowerCase()
+    return cats
+      .map(cat => {
+        const matches = cat.name.toLowerCase().includes(lowerQuery) ||
+          cat.description?.toLowerCase().includes(lowerQuery)
+        const filteredChildren = cat.children ? filterCategories(cat.children, query) : []
+        
+        if (matches || filteredChildren.length > 0) {
+          return {
+            ...cat,
+            children: filteredChildren.length > 0 ? filteredChildren : cat.children
+          }
+        }
+        return null
+      })
+      .filter((cat): cat is Category => cat !== null)
+  }
+  
+  const filteredCategories = useMemo(() => {
+    return filterCategories(categories, searchQuery)
+  }, [categories, searchQuery])
+  
+  const roots = filteredCategories
   const totalCount = useMemo(() => {
     const dfs = (nodes: Category[]): number =>
       nodes.reduce((acc, n) => acc + 1 + (n.children ? dfs(n.children as Category[]) : 0), 0)
-    return dfs(roots)
-  }, [roots])
+    return dfs(categories) // Total avant filtrage
+  }, [categories])
 
   const handleDelete = async (category: Category) => {
     const label = category.full_path ?? category.name
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette catégorie ?')) {
-      try {
-        await deleteCategory.mutateAsync(category.id)
-        if (category.id === activeCategoryId) {
-          setActiveCategoryId(null)
-        }
-      } catch (error) {
-        console.error('Erreur lors de la suppression:', error)
+    const toastId = toast.loading('Suppression en cours...')
+    
+    try {
+      await deleteCategory.mutateAsync(category.id)
+      if (category.id === activeCategoryId) {
+        setActiveCategoryId(null)
       }
+      toast.success('Catégorie supprimée', {
+        id: toastId,
+        description: `La catégorie "${label}" a été supprimée avec succès`
+      })
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail || 'Erreur lors de la suppression'
+      toast.error('Erreur de suppression', {
+        id: toastId,
+        description: errorMessage
+      })
+      console.error('Erreur lors de la suppression:', error)
     }
   }
 
@@ -163,19 +216,7 @@ export function CategoryList({ onEditCategory, showHeader = true }: CategoryList
   }
 
   if (categoriesQuery.isLoading) {
-    return (
-      <Card className="h-full">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg font-semibold">Catégories</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-64">
-          <div className="text-center text-muted-foreground">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-            Chargement...
-          </div>
-        </CardContent>
-      </Card>
-    )
+    return <CategoryListSkeleton />
   }
 
   if (categoriesQuery.isError) {
@@ -210,6 +251,38 @@ export function CategoryList({ onEditCategory, showHeader = true }: CategoryList
         </CardHeader>
       )}
       <CardContent className="p-0">
+        {/* Barre de recherche */}
+        {categories.length > 0 && (
+          <div className="p-2 border-b">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Rechercher une catégorie..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-9 h-9 text-sm"
+                aria-label="Rechercher dans les catégories"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-accent rounded"
+                  aria-label="Effacer la recherche"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+            {searchQuery && (
+              <p className="text-xs text-muted-foreground mt-2 px-1">
+                {roots.length > 0 
+                  ? `${roots.length} résultat${roots.length > 1 ? 's' : ''} trouvé${roots.length > 1 ? 's' : ''}`
+                  : 'Aucun résultat'}
+              </p>
+            )}
+          </div>
+        )}
         {categories.length === 0 ? (
           <div className="p-8 text-center">
             <div className="text-4xl mb-3">📂</div>

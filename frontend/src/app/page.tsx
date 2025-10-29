@@ -14,6 +14,8 @@ import { ExportPanel } from '@/components/export/ExportPanel'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import { toast } from 'sonner'
+import { formatCurrency } from '@/lib/utils'
 import { useCategories } from '@/hooks/useCategories'
 import { useExpenses } from '@/hooks/useExpenses'
 import { type Category, type Expense } from '@/lib/api'
@@ -31,27 +33,59 @@ function AppContent() {
   const [showCategoriesDesktop, setShowCategoriesDesktop] = useState(false)
 
   const handleCategorySubmit = async (data: Omit<CategorySubmitData, 'id'>) => {
+    const isEditing = !!editingCategory
+    const toastId = toast.loading(isEditing ? 'Modification en cours...' : 'Création en cours...')
+    
     try {
       if (editingCategory) {
         await updateCategory.mutateAsync({ id: editingCategory.id, payload: data })
         setEditingCategory(null)
+        toast.success('Catégorie modifiée', {
+          id: toastId,
+          description: `La catégorie "${data.name}" a été modifiée avec succès`
+        })
       } else {
         await createCategory.mutateAsync(data)
+        toast.success('Catégorie créée', {
+          id: toastId,
+          description: `La catégorie "${data.name}" a été créée avec succès`
+        })
       }
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail || 'Erreur lors de l\'opération'
+      toast.error('Erreur', {
+        id: toastId,
+        description: errorMessage
+      })
       console.error('Erreur catégorie:', error)
     }
   }
 
   const handleExpenseSubmit = async (data: ExpenseSubmitData) => {
+    const isEditing = !!editingExpense
+    const toastId = toast.loading(isEditing ? 'Modification en cours...' : 'Création en cours...')
+    
     try {
       if (editingExpense) {
         await updateExpense.mutateAsync({ id: editingExpense.id, payload: data })
         setEditingExpense(null)
+        toast.success('Dépense modifiée', {
+          id: toastId,
+          description: `La dépense de ${formatCurrency(data.amount, data.currency)} a été modifiée avec succès`
+        })
       } else {
         await createExpense.mutateAsync(data)
+        toast.success('Dépense ajoutée', {
+          id: toastId,
+          description: `La dépense de ${formatCurrency(data.amount, data.currency)} a été ajoutée avec succès`
+        })
       }
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail || 'Erreur lors de l\'opération'
+      toast.error('Erreur', {
+        id: toastId,
+        description: errorMessage
+      })
       console.error('Erreur dépense:', error)
     }
   }
@@ -184,12 +218,15 @@ function AppContent() {
 
           {/* Onglets Wise-style */}
           <div className="flex justify-center">
-            <div className="inline-flex bg-white p-1 lg:p-2 rounded-xl shadow-wise border border-gray-200 w-full max-w-md lg:max-w-none">
+            <div className="inline-flex bg-white p-1 lg:p-2 rounded-xl shadow-wise border border-gray-200 w-full max-w-md lg:max-w-none" role="tablist" aria-label="Navigation principale">
               <Button
                 variant={activeTab === 'create' ? 'default' : 'ghost'}
                 size="lg"
                 onClick={() => setActiveTab('create')}
-                className={`flex-1 lg:flex-none px-3 lg:px-6 py-2 lg:py-3 rounded-lg font-medium transition-all duration-200 text-sm lg:text-base ${activeTab === 'create'
+                role="tab"
+                aria-selected={activeTab === 'create'}
+                aria-controls="create-panel"
+                className={`flex-1 lg:flex-none px-3 lg:px-6 py-2 lg:py-3 rounded-lg font-medium transition-all duration-200 text-sm lg:text-base min-h-[44px] ${activeTab === 'create'
                   ? 'bg-green-600 text-white shadow-wise'
                   : 'hover:bg-green-50 hover:text-green-700 text-gray-700'
                   }`}
@@ -200,7 +237,10 @@ function AppContent() {
                 variant={activeTab === 'search' ? 'default' : 'ghost'}
                 size="lg"
                 onClick={() => setActiveTab('search')}
-                className={`flex-1 lg:flex-none px-3 lg:px-6 py-2 lg:py-3 rounded-lg font-medium transition-all duration-200 text-sm lg:text-base ${activeTab === 'search'
+                role="tab"
+                aria-selected={activeTab === 'search'}
+                aria-controls="search-panel"
+                className={`flex-1 lg:flex-none px-3 lg:px-6 py-2 lg:py-3 rounded-lg font-medium transition-all duration-200 text-sm lg:text-base min-h-[44px] ${activeTab === 'search'
                   ? 'bg-green-600 text-white shadow-wise'
                   : 'hover:bg-green-50 hover:text-green-700 text-gray-700'
                   }`}
@@ -211,7 +251,10 @@ function AppContent() {
                 variant={activeTab === 'export' ? 'default' : 'ghost'}
                 size="lg"
                 onClick={() => setActiveTab('export')}
-                className={`flex-1 lg:flex-none px-3 lg:px-6 py-2 lg:py-3 rounded-lg font-medium transition-all duration-200 text-sm lg:text-base ${activeTab === 'export'
+                role="tab"
+                aria-selected={activeTab === 'export'}
+                aria-controls="export-panel"
+                className={`flex-1 lg:flex-none px-3 lg:px-6 py-2 lg:py-3 rounded-lg font-medium transition-all duration-200 text-sm lg:text-base min-h-[44px] ${activeTab === 'export'
                   ? 'bg-green-600 text-white shadow-wise'
                   : 'hover:bg-green-50 hover:text-green-700 text-gray-700'
                   }`}
@@ -222,8 +265,7 @@ function AppContent() {
           </div>
 
           {activeTab === 'create' ? (
-            <div className="space-y-6">
-
+            <div className="space-y-6" id="create-panel" role="tabpanel" aria-labelledby="create-tab">
               <ExpenseForm
                 expense={editingExpense}
                 onSubmit={handleExpenseSubmit}
@@ -232,12 +274,14 @@ function AppContent() {
               />
             </div>
           ) : activeTab === 'search' ? (
-            <SearchPanel
-              onFiltersChange={handleSearchFiltersChange}
-              onReset={handleSearchReset}
-            />
+            <div id="search-panel" role="tabpanel" aria-labelledby="search-tab">
+              <SearchPanel
+                onFiltersChange={handleSearchFiltersChange}
+                onReset={handleSearchReset}
+              />
+            </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4" id="export-panel" role="tabpanel" aria-labelledby="export-tab">
               <Card className="p-4">
                 <div className="text-sm text-muted-foreground">
                   {t('dashboard.hint.export')}
