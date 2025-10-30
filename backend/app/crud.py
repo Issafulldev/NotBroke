@@ -50,15 +50,54 @@ async def create_user(session: AsyncSession, user: schemas.UserCreate) -> models
     session.add(db_user)
     await session.commit()
     await session.refresh(db_user)
+    
+    # Invalider le cache pour ce nouvel utilisateur (par précaution)
+    from .cache import invalidate
+    invalidate(f"user:{user.username}")
+    
     return db_user
 
 
 async def get_user_by_username(session: AsyncSession, username: str) -> models.User | None:
-    """Get a user by username."""
+    """Get a user by username with caching for better performance."""
+    from .cache import get as cache_get, set as cache_set
+    
+    # Vérifier le cache d'abord (TTL de 5 minutes pour les données utilisateur)
+    cache_key = f"user:{username}"
+    cached_data = cache_get(cache_key)
+    
+    if cached_data:
+        # Reconstruire l'objet User depuis les données en cache
+        # Cela évite une requête DB si les données sont encore valides
+        user = models.User(
+            id=cached_data['id'],
+            username=cached_data['username'],
+            email=cached_data['email'],
+            hashed_password=cached_data['hashed_password'],
+            is_active=cached_data['is_active'],
+            created_at=cached_data['created_at']
+        )
+        return user
+    
+    # Requête DB si pas en cache
     result = await session.execute(
         select(models.User).where(models.User.username == username)
     )
-    return result.scalars().first()
+    user = result.scalars().first()
+    
+    if user:
+        # Mettre en cache les données utilisateur (TTL de 5 minutes)
+        # Les données utilisateur changent rarement, donc un cache long est acceptable
+        cache_set(cache_key, {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'hashed_password': user.hashed_password,
+            'is_active': user.is_active,
+            'created_at': user.created_at
+        }, ttl=300)  # 5 minutes
+    
+    return user
 
 
 async def get_user_by_id(session: AsyncSession, user_id: int) -> models.User | None:
@@ -632,12 +671,6 @@ async def upsert_translation(
 
 async def seed_translations(session: AsyncSession) -> None:
     """Seed the database with default translations."""
-    # Check if translations already exist
-    result = await session.execute(select(func.count(models.Translation.id)))
-    count = result.scalar()
-    if count > 0:
-        return  # Already seeded
-
     translations_data = [
         # ========== FRENCH ==========
         ("fr", "common.appName", "NotBroke"),
@@ -663,11 +696,18 @@ async def seed_translations(session: AsyncSession) -> None:
         ("fr", "auth.register.password", "Mot de passe"),
         ("fr", "auth.register.passwordPlaceholder", "••••••••"),
         ("fr", "auth.register.passwordHelp", "Minimum 8 caractères avec majuscule, minuscule, chiffre et caractère spécial"),
+        ("fr", "auth.register.passwordChecklistTitle", "Votre mot de passe doit contenir :"),
+        ("fr", "auth.register.passwordRequirementLength", "Au moins 8 caractères"),
+        ("fr", "auth.register.passwordRequirementUppercase", "Au moins une lettre majuscule"),
+        ("fr", "auth.register.passwordRequirementLowercase", "Au moins une lettre minuscule"),
+        ("fr", "auth.register.passwordRequirementDigit", "Au moins un chiffre"),
+        ("fr", "auth.register.passwordRequirementSpecial", "Au moins un caractère spécial (!@#$% etc.)"),
         ("fr", "auth.register.confirmPassword", "Confirmer le mot de passe"),
         ("fr", "auth.register.confirmPasswordPlaceholder", "••••••••"),
         ("fr", "auth.register.button", "S'inscrire"),
         ("fr", "auth.register.registering", "Inscription en cours..."),
         ("fr", "auth.register.passwordMismatch", "Les mots de passe ne correspondent pas"),
+        ("fr", "auth.register.passwordInvalid", "Votre mot de passe ne respecte pas les exigences de sécurité"),
         ("fr", "auth.register.noAccount", "Vous avez déjà un compte ?"),
         ("fr", "auth.register.login", "Se connecter"),
         ("fr", "dashboard.title", "NotBroke"),
@@ -749,6 +789,11 @@ async def seed_translations(session: AsyncSession) -> None:
         ("fr", "errors.invalidLocale", "Locale non valide"),
         ("fr", "errors.failedFetchTranslations", "Impossible de récupérer les traductions"),
         ("fr", "errors.validationFailed", "Validation échouée"),
+        ("fr", "errors.passwordUppercase", "Le mot de passe doit contenir au moins une lettre majuscule"),
+        ("fr", "errors.passwordLowercase", "Le mot de passe doit contenir au moins une lettre minuscule"),
+        ("fr", "errors.passwordDigit", "Le mot de passe doit contenir au moins un chiffre"),
+        ("fr", "errors.passwordSpecial", "Le mot de passe doit contenir au moins un caractère spécial"),
+        ("fr", "errors.passwordLength", "Le mot de passe doit contenir au moins 8 caractères"),
         
         # ========== ENGLISH ==========
         ("en", "common.appName", "NotBroke"),
@@ -774,11 +819,18 @@ async def seed_translations(session: AsyncSession) -> None:
         ("en", "auth.register.password", "Password"),
         ("en", "auth.register.passwordPlaceholder", "••••••••"),
         ("en", "auth.register.passwordHelp", "Minimum 8 characters with uppercase, lowercase, digit and special character"),
+        ("en", "auth.register.passwordChecklistTitle", "Your password must include:"),
+        ("en", "auth.register.passwordRequirementLength", "At least 8 characters"),
+        ("en", "auth.register.passwordRequirementUppercase", "At least one uppercase letter"),
+        ("en", "auth.register.passwordRequirementLowercase", "At least one lowercase letter"),
+        ("en", "auth.register.passwordRequirementDigit", "At least one digit"),
+        ("en", "auth.register.passwordRequirementSpecial", "At least one special character (!@#$% etc.)"),
         ("en", "auth.register.confirmPassword", "Confirm password"),
         ("en", "auth.register.confirmPasswordPlaceholder", "••••••••"),
         ("en", "auth.register.button", "Sign up"),
         ("en", "auth.register.registering", "Signing up..."),
         ("en", "auth.register.passwordMismatch", "Passwords do not match"),
+        ("en", "auth.register.passwordInvalid", "Your password does not meet the security requirements"),
         ("en", "auth.register.noAccount", "Already have an account?"),
         ("en", "auth.register.login", "Sign in"),
         ("en", "dashboard.title", "NotBroke"),
@@ -860,6 +912,11 @@ async def seed_translations(session: AsyncSession) -> None:
         ("en", "errors.invalidLocale", "Invalid locale"),
         ("en", "errors.failedFetchTranslations", "Failed to fetch translations"),
         ("en", "errors.validationFailed", "Validation failed"),
+        ("en", "errors.passwordUppercase", "Password must contain at least one uppercase letter"),
+        ("en", "errors.passwordLowercase", "Password must contain at least one lowercase letter"),
+        ("en", "errors.passwordDigit", "Password must contain at least one digit"),
+        ("en", "errors.passwordSpecial", "Password must contain at least one special character"),
+        ("en", "errors.passwordLength", "Password must contain at least 8 characters"),
         
         # ========== RUSSIAN ==========
         ("ru", "common.appName", "NotBroke"),
@@ -885,11 +942,18 @@ async def seed_translations(session: AsyncSession) -> None:
         ("ru", "auth.register.password", "Пароль"),
         ("ru", "auth.register.passwordPlaceholder", "••••••••"),
         ("ru", "auth.register.passwordHelp", "Минимум 8 символов с заглавной, строчной буквой, цифрой и спецсимволом"),
+        ("ru", "auth.register.passwordChecklistTitle", "Пароль должен содержать:"),
+        ("ru", "auth.register.passwordRequirementLength", "Не менее 8 символов"),
+        ("ru", "auth.register.passwordRequirementUppercase", "Как минимум одну заглавную букву"),
+        ("ru", "auth.register.passwordRequirementLowercase", "Как минимум одну строчную букву"),
+        ("ru", "auth.register.passwordRequirementDigit", "Как минимум одну цифру"),
+        ("ru", "auth.register.passwordRequirementSpecial", "Как минимум один специальный символ (!@#$% и т.д.)"),
         ("ru", "auth.register.confirmPassword", "Подтверждение пароля"),
         ("ru", "auth.register.confirmPasswordPlaceholder", "••••••••"),
         ("ru", "auth.register.button", "Зарегистрироваться"),
         ("ru", "auth.register.registering", "Регистрация..."),
         ("ru", "auth.register.passwordMismatch", "Пароли не совпадают"),
+        ("ru", "auth.register.passwordInvalid", "Пароль не соответствует требованиям безопасности"),
         ("ru", "auth.register.noAccount", "Уже есть аккаунт?"),
         ("ru", "auth.register.login", "Войти"),
         ("ru", "dashboard.title", "NotBroke"),
@@ -971,11 +1035,13 @@ async def seed_translations(session: AsyncSession) -> None:
         ("ru", "errors.invalidLocale", "Неверная локаль"),
         ("ru", "errors.failedFetchTranslations", "Не удалось получить переводы"),
         ("ru", "errors.validationFailed", "Ошибка валидации"),
+        ("ru", "errors.passwordUppercase", "Пароль должен содержать как минимум одну заглавную букву"),
+        ("ru", "errors.passwordLowercase", "Пароль должен содержать как минимум одну строчную букву"),
+        ("ru", "errors.passwordDigit", "Пароль должен содержать как минимум одну цифру"),
+        ("ru", "errors.passwordSpecial", "Пароль должен содержать как минимум один специальный символ"),
+        ("ru", "errors.passwordLength", "Пароль должен содержать не менее 8 символов"),
     ]
 
     for locale, key, value in translations_data:
-        db_translation = models.Translation(locale=locale, key=key, value=value)
-        session.add(db_translation)
-
-    await session.flush()
+        await upsert_translation(session, locale, key, value)
 

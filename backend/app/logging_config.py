@@ -28,18 +28,21 @@ def setup_audit_logger():
                 log_obj.update(record.audit_data)
             return json.dumps(log_obj)
     
-    # Console handler
+    # Console handler (utilisé en production sur Render)
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(JSONFormatter())
     logger.addHandler(console_handler)
     
-    # File handler (audit trail)
+    # File handler uniquement en développement (évite les I/O bloquantes en production)
+    # En production sur Render, les logs sont capturés depuis stdout/stderr
     try:
-        file_handler = logging.FileHandler("audit.log")
-        file_handler.setFormatter(JSONFormatter())
-        logger.addHandler(file_handler)
+        from .config import config
+        if config.is_development:
+            file_handler = logging.FileHandler("audit.log")
+            file_handler.setFormatter(JSONFormatter())
+            logger.addHandler(file_handler)
     except Exception:
-        # If file handler fails, just use console
+        # Si l'import échoue ou la config n'est pas disponible, on continue sans file handler
         pass
     
     return logger

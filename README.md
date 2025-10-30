@@ -240,6 +240,7 @@ cd frontend && bun run dev
 
 ### **Identifiants de Développement**
 - **Setup**: Créez un compte utilisateur via l'interface d'inscription ou utilisez le script de migration pour initialiser un utilisateur administrateur
+- **Mot de passe**: Utilisez un mot de passe fort (8+ caractères avec majuscule, minuscule, chiffre et caractère spécial), sinon l'inscription sera refusée
 
 ### **Tests Locaux**
 1. **Backend**: `http://127.0.0.1:8000/docs`

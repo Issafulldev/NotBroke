@@ -18,6 +18,7 @@ interface UseTranslationsReturn {
 const SUPPORTED_LOCALES = ['fr', 'en', 'ru']
 const DEFAULT_LOCALE = 'fr'
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000'
+const TRANSLATIONS_CACHE_VERSION = 'v2'
 
 export function useTranslations(): UseTranslationsReturn {
   const locale = useLocaleStore((state) => state.locale)
@@ -34,7 +35,8 @@ export function useTranslations(): UseTranslationsReturn {
       setError(null)
       try {
         // 🆕 NOUVEAU: Vérifier le cache localStorage d'abord
-        const cacheKey = `translations_${locale}`
+        const cacheKey = `translations_${TRANSLATIONS_CACHE_VERSION}_${locale}`
+        const legacyCacheKey = `translations_${locale}`
         const cachedTranslations = localStorage.getItem(cacheKey)
 
         if (cachedTranslations) {
@@ -42,6 +44,10 @@ export function useTranslations(): UseTranslationsReturn {
           setTranslations(JSON.parse(cachedTranslations))
           setIsLoading(false)
           return
+        }
+
+        if (localStorage.getItem(legacyCacheKey)) {
+          localStorage.removeItem(legacyCacheKey)
         }
 
         console.log(`[i18n] Loading translations for locale: ${locale}`)
@@ -137,6 +143,12 @@ export function useTranslations(): UseTranslationsReturn {
       'Dépense non trouvée': 'errors.expenseNotFound',
       'Could not validate credentials': 'errors.couldNotValidateCredentials',
       'Impossible de valider': 'errors.couldNotValidateCredentials',
+      'password must contain at least one uppercase letter': 'errors.passwordUppercase',
+      'password must contain at least one lowercase letter': 'errors.passwordLowercase',
+      'password must contain at least one digit': 'errors.passwordDigit',
+      'password must contain at least one special character': 'errors.passwordSpecial',
+      'password must contain at least one special character (!@#$%^&*...)': 'errors.passwordSpecial',
+      'string should have at least 8 characters': 'errors.passwordLength',
     }
 
     // Try to find a matching translation key

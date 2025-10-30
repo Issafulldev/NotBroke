@@ -24,6 +24,45 @@ export function RegisterForm() {
   const login = useAuthStore(state => state.login)
   const router = useRouter()
 
+  const getPasswordChecks = (password: string) => ({
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    digit: /[0-9]/.test(password),
+    special: /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password),
+  })
+
+  const passwordChecks = getPasswordChecks(formData.password)
+  const isPasswordStrong = Object.values(passwordChecks).every(Boolean)
+
+  const passwordRequirements = [
+    {
+      key: 'length',
+      label: t('auth.register.passwordRequirementLength') || 'Au moins 8 caractères',
+      met: passwordChecks.length,
+    },
+    {
+      key: 'uppercase',
+      label: t('auth.register.passwordRequirementUppercase') || 'Une lettre majuscule',
+      met: passwordChecks.uppercase,
+    },
+    {
+      key: 'lowercase',
+      label: t('auth.register.passwordRequirementLowercase') || 'Une lettre minuscule',
+      met: passwordChecks.lowercase,
+    },
+    {
+      key: 'digit',
+      label: t('auth.register.passwordRequirementDigit') || 'Un chiffre',
+      met: passwordChecks.digit,
+    },
+    {
+      key: 'special',
+      label: t('auth.register.passwordRequirementSpecial') || 'Un caractère spécial (!@#$…)',
+      met: passwordChecks.special,
+    },
+  ]
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -31,6 +70,15 @@ export function RegisterForm() {
 
     if (formData.password !== formData.confirmPassword) {
       setError(t('auth.register.passwordMismatch') || 'Les mots de passe ne correspondent pas')
+      setIsLoading(false)
+      return
+    }
+
+    if (!isPasswordStrong) {
+      setError(
+        t('auth.register.passwordInvalid')
+        || 'Votre mot de passe doit comporter une majuscule, une minuscule, un chiffre et un caractère spécial'
+      )
       setIsLoading(false)
       return
     }
@@ -153,6 +201,22 @@ export function RegisterForm() {
             <p className="text-xs text-gray-500">
               {t('auth.register.passwordHelp') || 'Minimum 8 caractères avec majuscule, minuscule, chiffre et caractère spécial'}
             </p>
+            <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-semibold text-gray-600">
+                {t('auth.register.passwordChecklistTitle') || 'Votre mot de passe doit contenir :'}
+              </p>
+              <ul className="mt-1 space-y-1 text-xs">
+                {passwordRequirements.map(requirement => (
+                  <li
+                    key={requirement.key}
+                    className={`flex items-center gap-2 ${requirement.met ? 'text-emerald-600' : 'text-gray-500'}`}
+                  >
+                    <span className="inline-block h-2 w-2 rounded-full bg-current" aria-hidden="true" />
+                    <span>{requirement.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           <div className="space-y-2">

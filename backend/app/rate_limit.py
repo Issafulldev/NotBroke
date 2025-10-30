@@ -50,3 +50,8 @@ def get_rate_limit_key(endpoint: str, client_ip: str | None, requests_per_minute
     if not client_ip:
         return f"{endpoint}:unknown"
     return f"{endpoint}:{client_ip}:{requests_per_minute}"
+
+
+def reset_rate_limit_store() -> None:
+    """Clear the in-memory rate limit store (useful for tests)."""
+    _rate_limit_store.clear()

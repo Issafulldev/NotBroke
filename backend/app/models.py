@@ -25,11 +25,13 @@ class User(Base):
     )
 
     # Relations avec les données existantes
+    # lazy="noload" empêche le chargement automatique des relations lors de la sérialisation
+    # Cela améliore significativement les performances du login
     categories: Mapped[list["Category"]] = relationship(
-        "Category", back_populates="user", cascade="all, delete-orphan"
+        "Category", back_populates="user", cascade="all, delete-orphan", lazy="noload"
     )
     expenses: Mapped[list["Expense"]] = relationship(
-        "Expense", back_populates="user", cascade="all, delete-orphan"
+        "Expense", back_populates="user", cascade="all, delete-orphan", lazy="noload"
     )
 
 

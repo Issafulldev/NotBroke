@@ -203,15 +203,23 @@ def rate_limit(requests_per_minute: int):
 @app.on_event("startup")
 async def on_startup() -> None:
     await init_db()
-    # Seed translations on startup
+    # Seed translations on startup (only if they don't exist yet)
+    # Cela évite les insertions répétées à chaque redémarrage
     from .database import AsyncSessionLocal
     session = AsyncSessionLocal()
     try:
-        await crud.seed_translations(session)
-        await session.commit()
+        # Vérifier si les traductions existent déjà (une seule requête rapide)
+        existing_fr = await crud.get_translations_by_locale(session, 'fr')
+        if not existing_fr:
+            print("🌱 Seeding translations...")
+            await crud.seed_translations(session)
+            await session.commit()
+            print("✅ Translations seeded successfully")
+        else:
+            print("✅ Translations already exist, skipping seed")
     except Exception as e:
         await session.rollback()
-        print(f"Error seeding translations: {e}")
+        print(f"⚠️  Error seeding translations: {e}")
     finally:
         await session.close()
 

@@ -44,7 +44,7 @@ class TestAuthAPI:
         user_data = {
             "username": "testuser",
             "email": "test@example.com",
-            "password": "testpassword123"
+            "password": "StrongPassw0rd!"
         }
 
         response = await client.post("/auth/register", json=user_data)
@@ -68,13 +68,28 @@ class TestAuthAPI:
         assert user.is_active is True
 
     @pytest.mark.asyncio
+    async def test_register_user_weak_password_rejected(self, client):
+        """Test that weak password fails validation."""
+        weak_password_user = {
+            "username": "weakpassuser",
+            "email": "weak@example.com",
+            "password": "password123"
+        }
+
+        response = await client.post("/auth/register", json=weak_password_user)
+
+        assert response.status_code == 422
+        detail = response.json().get("detail", [])
+        assert any("uppercase" in (error.get("msg") or "") for error in detail)
+
+    @pytest.mark.asyncio
     async def test_register_duplicate_username(self, client, db_session):
         """Test registration with duplicate username fails."""
         # Create first user
         user_data = {
             "username": "testuser",
             "email": "test@example.com",
-            "password": "testpassword123"
+            "password": "StrongPassw0rd!"
         }
         await client.post("/auth/register", json=user_data)
 
@@ -82,7 +97,7 @@ class TestAuthAPI:
         duplicate_data = {
             "username": "testuser",
             "email": "test2@example.com",
-            "password": "testpassword456"
+            "password": "An0therStrong!"
         }
 
         response = await client.post("/auth/register", json=duplicate_data)
@@ -97,7 +112,7 @@ class TestAuthAPI:
         user_data = {
             "username": "testuser",
             "email": "test@example.com",
-            "password": "testpassword123"
+            "password": "StrongPassw0rd!"
         }
         await client.post("/auth/register", json=user_data)
 
@@ -105,7 +120,7 @@ class TestAuthAPI:
         duplicate_data = {
             "username": "testuser2",
             "email": "test@example.com",
-            "password": "testpassword456"
+            "password": "An0therStrong!"
         }
 
         response = await client.post("/auth/register", json=duplicate_data)
@@ -120,14 +135,14 @@ class TestAuthAPI:
         user_data = {
             "username": "testuser",
             "email": "test@example.com",
-            "password": "testpassword123"
+            "password": "StrongPassw0rd!"
         }
         await client.post("/auth/register", json=user_data)
 
         # Now try to login
         login_data = {
             "username": "testuser",
-            "password": "testpassword123"
+            "password": "StrongPassw0rd!"
         }
 
         response = await client.post("/auth/login", json=login_data)
@@ -146,7 +161,7 @@ class TestAuthAPI:
         user_data = {
             "username": "testuser",
             "email": "test@example.com",
-            "password": "testpassword123"
+            "password": "StrongPassw0rd!"
         }
         await client.post("/auth/register", json=user_data)
 
