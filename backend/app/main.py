@@ -228,15 +228,30 @@ async def on_startup() -> None:
     from .database import AsyncSessionLocal
     session = AsyncSessionLocal()
     try:
-        # Vérifier si les traductions existent déjà (une seule requête rapide)
-        existing_fr = await crud.get_translations_by_locale(session, 'fr')
-        if not existing_fr:
-            print("🌱 Seeding translations...")
+        required_locales = ['fr', 'en', 'ru']
+        required_keys = {
+            'auth.register.passwordChecklistTitle',
+            'auth.register.passwordRequirementLength',
+            'auth.register.passwordRequirementUppercase',
+            'auth.register.passwordRequirementLowercase',
+            'auth.register.passwordRequirementDigit',
+            'auth.register.passwordRequirementSpecial',
+        }
+
+        missing_by_locale: dict[str, list[str]] = {}
+        for locale in required_locales:
+            existing_translations = await crud.get_translations_by_locale(session, locale)
+            missing_keys = [key for key in required_keys if key not in existing_translations]
+            if missing_keys:
+                missing_by_locale[locale] = missing_keys
+
+        if missing_by_locale:
+            print(f"🌱 Seeding translations (missing keys detected): {missing_by_locale}")
             await crud.seed_translations(session)
             await session.commit()
             print("✅ Translations seeded successfully")
         else:
-            print("✅ Translations already exist, skipping seed")
+            print("✅ Translations already up to date")
     except Exception as e:
         await session.rollback()
         print(f"⚠️  Error seeding translations: {e}")
