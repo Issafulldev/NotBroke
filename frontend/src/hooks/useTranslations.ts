@@ -18,7 +18,7 @@ interface UseTranslationsReturn {
 const SUPPORTED_LOCALES = ['fr', 'en', 'ru']
 const DEFAULT_LOCALE = 'fr'
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000'
-const TRANSLATIONS_CACHE_VERSION = 'v2'
+const TRANSLATIONS_CACHE_VERSION = 'v3'
 
 export function useTranslations(): UseTranslationsReturn {
   const locale = useLocaleStore((state) => state.locale)
