@@ -163,6 +163,9 @@ async def create_category(session: AsyncSession, category: schemas.CategoryCreat
     
     Ensures category name uniqueness per user (not globally).
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     data = category.model_dump()
     if data.get("parent_id") is not None and data["parent_id"] == data.get("id"):
         data["parent_id"] = None
@@ -170,28 +173,45 @@ async def create_category(session: AsyncSession, category: schemas.CategoryCreat
     # Vérifier qu'une catégorie avec le même nom n'existe pas déjà pour cet utilisateur
     # Cela évite les erreurs d'unicité et garantit que chaque utilisateur peut avoir ses propres catégories
     parent_id = data.get("parent_id")
+    category_name = data["name"].strip().lower()  # Normaliser le nom (supprimer les espaces, minuscules)
+    original_name = data["name"].strip()  # Garder le nom original pour l'affichage
+    
+    logger.debug(f"Creating category: user_id={user_id}, name='{original_name}', parent_id={parent_id}")
+    
+    # Récupérer toutes les catégories de l'utilisateur avec le même parent_id
     existing_query = select(models.Category).where(
-        models.Category.user_id == user_id,
-        models.Category.name == data["name"]
+        models.Category.user_id == user_id
     )
+    
     # Comparer parent_id correctement (NULL-safe)
     if parent_id is None:
         existing_query = existing_query.where(models.Category.parent_id.is_(None))
     else:
         existing_query = existing_query.where(models.Category.parent_id == parent_id)
     
-    existing_category = await session.execute(existing_query)
-    if existing_category.first():
-        raise CategoryNameConflictError(
-            f"Category name '{data['name']}' already exists"
-        )
+    existing_categories = await session.execute(existing_query)
+    all_existing = existing_categories.scalars().all()
     
+    # Vérifier manuellement si une catégorie avec le même nom (normalisé) existe
+    for existing in all_existing:
+        existing_name_normalized = existing.name.strip().lower()
+        if existing_name_normalized == category_name:
+            logger.warning(f"Category conflict detected: user_id={user_id}, name='{original_name}', existing_id={existing.id}, existing_name='{existing.name}'")
+            raise CategoryNameConflictError(
+                f"Category name '{original_name}' already exists"
+            )
+    
+    logger.debug(f"No conflict found, proceeding with category creation")
+    
+    # Utiliser le nom normalisé (mais garder la casse originale)
+    data["name"] = original_name
     db_category = models.Category(**data, user_id=user_id)
     session.add(db_category)
     try:
         await session.flush()
     except IntegrityError as exc:  # pragma: no cover - depends on DB backend
         # Fallback si la vérification explicite n'a pas fonctionné
+        logger.error(f"IntegrityError during category creation: {exc}", exc_info=True)
         raise CategoryNameConflictError("Category name already exists") from exc
     await session.refresh(db_category)
     await session.refresh(db_category, attribute_names=["parent"])
