@@ -189,63 +189,82 @@ async def create_category(session: AsyncSession, category: schemas.CategoryCreat
     
     logger.info(f"Creating category: user_id={user_id}, name='{original_name}', parent_id={parent_id}")
     
-    # IMPORTANT: Vérifier d'abord s'il existe vraiment des catégories pour cet utilisateur
-    # Cela aide à déboguer les problèmes sur Render/PostgreSQL
-    all_user_categories_query = select(models.Category).where(
-        models.Category.user_id == user_id
-    )
-    all_user_categories_result = await session.execute(all_user_categories_query)
-    all_user_categories = all_user_categories_result.scalars().all()
-    
-    logger.info(f"Total categories for user_id={user_id}: {len(all_user_categories)}")
-    if all_user_categories:
-        logger.info(f"All user categories: {[(c.id, c.name, c.parent_id, c.user_id) for c in all_user_categories]}")
-    
-    # Récupérer les catégories de l'utilisateur avec le même parent_id
-    # Utiliser une approche plus explicite pour PostgreSQL
-    if parent_id is None:
-        # Pour parent_id NULL, utiliser IS NULL explicitement
-        existing_query = select(models.Category).where(
-            models.Category.user_id == user_id,
-            models.Category.parent_id.is_(None)
+    try:
+        # IMPORTANT: Vérifier d'abord s'il existe vraiment des catégories pour cet utilisateur
+        # Cela aide à déboguer les problèmes sur Render/PostgreSQL
+        all_user_categories_query = select(models.Category).where(
+            models.Category.user_id == user_id
         )
-    else:
-        # Pour parent_id spécifique, utiliser l'égalité
-        existing_query = select(models.Category).where(
-            models.Category.user_id == user_id,
-            models.Category.parent_id == parent_id
-        )
-    
-    existing_categories_result = await session.execute(existing_query)
-    all_existing = existing_categories_result.scalars().all()
-    
-    logger.info(f"Found {len(all_existing)} existing categories for user_id={user_id} with parent_id={parent_id}")
-    
-    # Log toutes les catégories trouvées pour débogage
-    if all_existing:
-        logger.info(f"Existing categories with same parent_id: {[(c.id, c.name, c.parent_id, c.user_id) for c in all_existing]}")
-    
-    # Vérifier manuellement si une catégorie avec le même nom (normalisé) existe
-    # DOUBLE CHECK: Vérifier aussi que le user_id correspond bien
-    for existing in all_existing:
-        # Sécurité supplémentaire : vérifier que le user_id correspond
-        if existing.user_id != user_id:
-            logger.error(f"CRITICAL: Found category with wrong user_id! category_id={existing.id}, category_user_id={existing.user_id}, expected_user_id={user_id}")
-            continue  # Ignorer cette catégorie car elle ne devrait pas être là
+        all_user_categories_result = await session.execute(all_user_categories_query)
+        all_user_categories = all_user_categories_result.scalars().all()
         
-        existing_name_normalized = existing.name.strip().lower()
-        logger.debug(f"Comparing: '{existing_name_normalized}' == '{category_name}' for category_id={existing.id}")
-        if existing_name_normalized == category_name:
-            logger.warning(
-                f"Category conflict detected: user_id={user_id}, name='{original_name}', "
-                f"existing_id={existing.id}, existing_name='{existing.name}', "
-                f"existing_parent_id={existing.parent_id}, existing_user_id={existing.user_id}"
+        logger.info(f"Total categories for user_id={user_id}: {len(all_user_categories)}")
+        if all_user_categories:
+            # Convertir les objets en tuples simples pour éviter les problèmes de sérialisation dans les logs
+            try:
+                categories_info = [(c.id, c.name, c.parent_id, c.user_id) for c in all_user_categories]
+                logger.info(f"All user categories: {categories_info}")
+            except Exception as log_err:
+                logger.warning(f"Could not log categories details: {log_err}")
+        
+        # Récupérer les catégories de l'utilisateur avec le même parent_id
+        # Utiliser une approche plus explicite pour PostgreSQL
+        if parent_id is None:
+            # Pour parent_id NULL, utiliser IS NULL explicitement
+            existing_query = select(models.Category).where(
+                models.Category.user_id == user_id,
+                models.Category.parent_id.is_(None)
             )
-            raise CategoryNameConflictError(
-                f"Category name '{original_name}' already exists"
+        else:
+            # Pour parent_id spécifique, utiliser l'égalité
+            existing_query = select(models.Category).where(
+                models.Category.user_id == user_id,
+                models.Category.parent_id == parent_id
             )
-    
-    logger.info(f"No conflict found for user_id={user_id}, name='{original_name}', proceeding with creation")
+        
+        existing_categories_result = await session.execute(existing_query)
+        all_existing = existing_categories_result.scalars().all()
+        
+        logger.info(f"Found {len(all_existing)} existing categories for user_id={user_id} with parent_id={parent_id}")
+        
+        # Log toutes les catégories trouvées pour débogage
+        if all_existing:
+            # Convertir les objets en tuples simples pour éviter les problèmes de sérialisation dans les logs
+            try:
+                existing_info = [(c.id, c.name, c.parent_id, c.user_id) for c in all_existing]
+                logger.info(f"Existing categories with same parent_id: {existing_info}")
+            except Exception as log_err:
+                logger.warning(f"Could not log existing categories details: {log_err}")
+        
+        # Vérifier manuellement si une catégorie avec le même nom (normalisé) existe
+        # DOUBLE CHECK: Vérifier aussi que le user_id correspond bien
+        for existing in all_existing:
+            # Sécurité supplémentaire : vérifier que le user_id correspond
+            if existing.user_id != user_id:
+                logger.error(f"CRITICAL: Found category with wrong user_id! category_id={existing.id}, category_user_id={existing.user_id}, expected_user_id={user_id}")
+                continue  # Ignorer cette catégorie car elle ne devrait pas être là
+            
+            existing_name_normalized = existing.name.strip().lower()
+            logger.debug(f"Comparing: '{existing_name_normalized}' == '{category_name}' for category_id={existing.id}")
+            if existing_name_normalized == category_name:
+                logger.warning(
+                    f"Category conflict detected: user_id={user_id}, name='{original_name}', "
+                    f"existing_id={existing.id}, existing_name='{existing.name}', "
+                    f"existing_parent_id={existing.parent_id}, existing_user_id={existing.user_id}"
+                )
+                raise CategoryNameConflictError(
+                    f"Category name '{original_name}' already exists"
+                )
+        
+        logger.info(f"No conflict found for user_id={user_id}, name='{original_name}', proceeding with creation")
+    except CategoryNameConflictError:
+        # Re-raise les erreurs de conflit directement
+        raise
+    except Exception as check_err:
+        # Log mais continuer - la vérification a échoué mais on peut quand même essayer de créer
+        logger.error(f"Error during category check: {check_err}", exc_info=True)
+        # Ne pas bloquer la création si la vérification échoue
+        # On fait confiance à la contrainte d'intégrité de la DB
     
     # Utiliser le nom normalisé (mais garder la casse originale)
     data["name"] = original_name
@@ -267,27 +286,51 @@ async def create_category(session: AsyncSession, category: schemas.CategoryCreat
         
         # Vérifier une dernière fois si la catégorie existe vraiment
         # Cela peut arriver en cas de race condition sur Render avec plusieurs instances
-        final_check = await session.execute(
-            select(models.Category).where(
-                models.Category.user_id == user_id,
-                func.lower(models.Category.name) == category_name
+        # Utiliser une comparaison simple sans func.lower pour éviter les problèmes de compatibilité
+        try:
+            final_check_query = select(models.Category).where(
+                models.Category.user_id == user_id
             )
+            if parent_id is None:
+                final_check_query = final_check_query.where(models.Category.parent_id.is_(None))
+            else:
+                final_check_query = final_check_query.where(models.Category.parent_id == parent_id)
+            
+            final_check_result = await session.execute(final_check_query)
+            final_check_categories = final_check_result.scalars().all()
+            
+            # Comparer manuellement en Python
+            for check_cat in final_check_categories:
+                if check_cat.name.strip().lower() == category_name:
+                    raise CategoryNameConflictError(
+                        f"Category name '{original_name}' already exists (detected during insert)"
+                    )
+        except CategoryNameConflictError:
+            raise
+        except Exception as check_exc:
+            logger.error(f"Error during final check: {check_exc}", exc_info=True)
+        
+        # Si on arrive ici, l'erreur d'intégrité vient d'autre chose
+        raise CategoryNameConflictError("Category name already exists") from exc
+    
+    try:
+        await session.refresh(db_category)
+        await session.refresh(db_category, attribute_names=["parent"])
+        category_map = await _load_category_map(session, user_id)
+        setattr(
+            db_category,
+            "full_path",
+            _build_category_path_from_map(db_category.id, category_map),
         )
-        if final_check.first():
-            raise CategoryNameConflictError(
-                f"Category name '{original_name}' already exists (detected during insert)"
-            )
-        else:
-            # L'erreur d'intégrité vient d'autre chose, la relancer
-            raise CategoryNameConflictError("Category name already exists") from exc
-    await session.refresh(db_category)
-    await session.refresh(db_category, attribute_names=["parent"])
-    category_map = await _load_category_map(session, user_id)
-    setattr(
-        db_category,
-        "full_path",
-        _build_category_path_from_map(db_category.id, category_map),
-    )
+    except Exception as refresh_err:
+        logger.error(f"Error refreshing category or building full_path: {refresh_err}", exc_info=True)
+        # On continue quand même - la catégorie a été créée, même si le full_path n'est pas défini
+        # On construit un chemin simple pour éviter une erreur
+        try:
+            setattr(db_category, "full_path", original_name)
+        except Exception:
+            pass  # Si même ça échoue, on continue sans full_path
+    
     return db_category
 
 

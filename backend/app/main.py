@@ -358,12 +358,18 @@ async def create_category(
         category = await crud.create_category(session, payload, current_user.id)
         log_security_event("CATEGORY_CREATED", current_user.id, {"category_id": category.id, "name": category.name})
         logger.info(f"Category created successfully: id={category.id}, name='{category.name}'")
+        cache_invalidate(f"categories:{current_user.id}")
+        cache_invalidate(f"summary:{current_user.id}")
+        return category
     except crud.CategoryNameConflictError as exc:
         logger.warning(f"Category creation failed: {exc} for user_id={current_user.id}")
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    cache_invalidate(f"categories:{current_user.id}")
-    cache_invalidate(f"summary:{current_user.id}")
-    return category
+    except Exception as exc:
+        logger.error(f"Unexpected error creating category: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred while creating the category"
+        ) from exc
 
 
 @app.get("/categories", response_model=schemas.PaginatedCategories)
