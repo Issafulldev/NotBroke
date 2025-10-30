@@ -91,7 +91,10 @@ export function useTranslations(): UseTranslationsReturn {
   }
 
   const t = (key: string): string => {
-    return translations[key] || key
+    const translation = translations[key]
+    // Si la traduction existe et n'est pas vide, la retourner
+    // Sinon retourner la clé (qui sera utilisée comme fallback dans le composant)
+    return translation && translation !== '' ? translation : key
   }
 
   const translateError = (errorMessage: string | undefined | null | any): string => {

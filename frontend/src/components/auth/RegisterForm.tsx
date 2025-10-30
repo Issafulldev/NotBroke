@@ -24,6 +24,12 @@ export function RegisterForm() {
   const login = useAuthStore(state => state.login)
   const router = useRouter()
 
+  // Helper function to get translation with fallback
+  const tWithFallback = (key: string, fallback: string): string => {
+    const translation = t(key)
+    return translation !== key ? translation : fallback
+  }
+
   const getPasswordChecks = (password: string) => ({
     length: password.length >= 8,
     uppercase: /[A-Z]/.test(password),
@@ -38,27 +44,27 @@ export function RegisterForm() {
   const passwordRequirements = [
     {
       key: 'length',
-      label: t('auth.register.passwordRequirementLength') || 'Au moins 8 caractères',
+      label: tWithFallback('auth.register.passwordRequirementLength', 'Au moins 8 caractères'),
       met: passwordChecks.length,
     },
     {
       key: 'uppercase',
-      label: t('auth.register.passwordRequirementUppercase') || 'Une lettre majuscule',
+      label: tWithFallback('auth.register.passwordRequirementUppercase', 'Au moins une lettre majuscule'),
       met: passwordChecks.uppercase,
     },
     {
       key: 'lowercase',
-      label: t('auth.register.passwordRequirementLowercase') || 'Une lettre minuscule',
+      label: tWithFallback('auth.register.passwordRequirementLowercase', 'Au moins une lettre minuscule'),
       met: passwordChecks.lowercase,
     },
     {
       key: 'digit',
-      label: t('auth.register.passwordRequirementDigit') || 'Un chiffre',
+      label: tWithFallback('auth.register.passwordRequirementDigit', 'Au moins un chiffre'),
       met: passwordChecks.digit,
     },
     {
       key: 'special',
-      label: t('auth.register.passwordRequirementSpecial') || 'Un caractère spécial (!@#$…)',
+      label: tWithFallback('auth.register.passwordRequirementSpecial', 'Au moins un caractère spécial (!@#$% etc.)'),
       met: passwordChecks.special,
     },
   ]
@@ -203,7 +209,7 @@ export function RegisterForm() {
             </p>
             <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-3">
               <p className="text-xs font-semibold text-gray-600">
-                {t('auth.register.passwordChecklistTitle') || 'Votre mot de passe doit contenir :'}
+                {tWithFallback('auth.register.passwordChecklistTitle', 'Votre mot de passe doit contenir :')}
               </p>
               <ul className="mt-1 space-y-1 text-xs">
                 {passwordRequirements.map(requirement => (

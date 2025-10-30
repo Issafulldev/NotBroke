@@ -159,14 +159,39 @@ def _build_category_path_from_map(
 
 
 async def create_category(session: AsyncSession, category: schemas.CategoryCreate, user_id: int) -> models.Category:
+    """Create a new category for a user.
+    
+    Ensures category name uniqueness per user (not globally).
+    """
     data = category.model_dump()
     if data.get("parent_id") is not None and data["parent_id"] == data.get("id"):
         data["parent_id"] = None
+    
+    # Vérifier qu'une catégorie avec le même nom n'existe pas déjà pour cet utilisateur
+    # Cela évite les erreurs d'unicité et garantit que chaque utilisateur peut avoir ses propres catégories
+    parent_id = data.get("parent_id")
+    existing_query = select(models.Category).where(
+        models.Category.user_id == user_id,
+        models.Category.name == data["name"]
+    )
+    # Comparer parent_id correctement (NULL-safe)
+    if parent_id is None:
+        existing_query = existing_query.where(models.Category.parent_id.is_(None))
+    else:
+        existing_query = existing_query.where(models.Category.parent_id == parent_id)
+    
+    existing_category = await session.execute(existing_query)
+    if existing_category.first():
+        raise CategoryNameConflictError(
+            f"Category name '{data['name']}' already exists"
+        )
+    
     db_category = models.Category(**data, user_id=user_id)
     session.add(db_category)
     try:
         await session.flush()
     except IntegrityError as exc:  # pragma: no cover - depends on DB backend
+        # Fallback si la vérification explicite n'a pas fonctionné
         raise CategoryNameConflictError("Category name already exists") from exc
     await session.refresh(db_category)
     await session.refresh(db_category, attribute_names=["parent"])
@@ -252,6 +277,7 @@ async def get_category(session: AsyncSession, category_id: int, user_id: int) ->
 async def update_category(
     session: AsyncSession, category_id: int, payload: schemas.CategoryUpdate, user_id: int
 ) -> models.Category | None:
+    """Update a category, ensuring name uniqueness per user."""
     category = await session.get(models.Category, category_id)
     if category is None or category.user_id != user_id:
         return None
@@ -259,6 +285,28 @@ async def update_category(
     data = payload.model_dump(exclude_unset=True)
     if "parent_id" in data and data["parent_id"] == category_id:
         data["parent_id"] = None
+    
+    # Si le nom est modifié, vérifier qu'aucune autre catégorie n'a déjà ce nom pour cet utilisateur
+    if "name" in data:
+        # Vérifier qu'une autre catégorie (différente de celle-ci) avec le même nom n'existe pas
+        new_parent_id = data.get("parent_id", category.parent_id)
+        existing_query = select(models.Category).where(
+            models.Category.user_id == user_id,
+            models.Category.name == data["name"],
+            models.Category.id != category_id  # Exclure la catégorie actuelle
+        )
+        # Comparer parent_id correctement (NULL-safe)
+        if new_parent_id is None:
+            existing_query = existing_query.where(models.Category.parent_id.is_(None))
+        else:
+            existing_query = existing_query.where(models.Category.parent_id == new_parent_id)
+        
+        existing_category = await session.execute(existing_query)
+        if existing_category.first():
+            raise CategoryNameConflictError(
+                f"Category name '{data['name']}' already exists"
+            )
+    
     for field, value in data.items():
         setattr(category, field, value)
 
