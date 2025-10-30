@@ -1,0 +1,17 @@
+{
+    "venvPath": "backend",
+    "venv": "venv",
+    "pythonVersion": "3.11",
+    "typeCheckingMode": "basic",
+    "reportMissingImports": false,
+    "reportMissingModuleSource": false,
+    "pythonPlatform": "Darwin",
+    "executionEnvironments": [
+        {
+            "root": "backend",
+            "pythonVersion": "3.11",
+            "extraPaths": []
+        }
+    ]
+}
+
