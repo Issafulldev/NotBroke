@@ -176,7 +176,7 @@ async def create_category(session: AsyncSession, category: schemas.CategoryCreat
     category_name = data["name"].strip().lower()  # Normaliser le nom (supprimer les espaces, minuscules)
     original_name = data["name"].strip()  # Garder le nom original pour l'affichage
     
-    logger.debug(f"Creating category: user_id={user_id}, name='{original_name}', parent_id={parent_id}")
+    logger.info(f"Creating category: user_id={user_id}, name='{original_name}', parent_id={parent_id}")
     
     # Récupérer toutes les catégories de l'utilisateur avec le même parent_id
     existing_query = select(models.Category).where(
@@ -189,19 +189,30 @@ async def create_category(session: AsyncSession, category: schemas.CategoryCreat
     else:
         existing_query = existing_query.where(models.Category.parent_id == parent_id)
     
-    existing_categories = await session.execute(existing_query)
-    all_existing = existing_categories.scalars().all()
+    existing_categories_result = await session.execute(existing_query)
+    all_existing = existing_categories_result.scalars().all()
+    
+    logger.info(f"Found {len(all_existing)} existing categories for user_id={user_id} with parent_id={parent_id}")
+    
+    # Log toutes les catégories trouvées pour débogage
+    if all_existing:
+        logger.info(f"Existing categories: {[(c.id, c.name, c.parent_id) for c in all_existing]}")
     
     # Vérifier manuellement si une catégorie avec le même nom (normalisé) existe
     for existing in all_existing:
         existing_name_normalized = existing.name.strip().lower()
+        logger.debug(f"Comparing: '{existing_name_normalized}' == '{category_name}' for category_id={existing.id}")
         if existing_name_normalized == category_name:
-            logger.warning(f"Category conflict detected: user_id={user_id}, name='{original_name}', existing_id={existing.id}, existing_name='{existing.name}'")
+            logger.warning(
+                f"Category conflict detected: user_id={user_id}, name='{original_name}', "
+                f"existing_id={existing.id}, existing_name='{existing.name}', "
+                f"existing_parent_id={existing.parent_id}"
+            )
             raise CategoryNameConflictError(
                 f"Category name '{original_name}' already exists"
             )
     
-    logger.debug(f"No conflict found, proceeding with category creation")
+    logger.info(f"No conflict found for user_id={user_id}, name='{original_name}', proceeding with creation")
     
     # Utiliser le nom normalisé (mais garder la casse originale)
     data["name"] = original_name

@@ -350,10 +350,16 @@ async def create_category(
     current_user = Depends(get_current_user),
     session=Depends(get_session)
 ):
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"POST /categories - user_id={current_user.id}, name='{payload.name}', parent_id={payload.parent_id}")
+    
     try:
         category = await crud.create_category(session, payload, current_user.id)
         log_security_event("CATEGORY_CREATED", current_user.id, {"category_id": category.id, "name": category.name})
+        logger.info(f"Category created successfully: id={category.id}, name='{category.name}'")
     except crud.CategoryNameConflictError as exc:
+        logger.warning(f"Category creation failed: {exc} for user_id={current_user.id}")
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     cache_invalidate(f"categories:{current_user.id}")
     cache_invalidate(f"summary:{current_user.id}")
