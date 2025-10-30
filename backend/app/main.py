@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 from datetime import datetime
 from functools import wraps
 from typing import Annotated
@@ -171,13 +172,31 @@ async def add_security_headers(request: Request, call_next):
     
     return response
 
+# Middleware de timing pour mesurer les performances
+@app.middleware("http")
+async def add_timing_header(request: Request, call_next):
+    """Ajoute un header X-Process-Time pour mesurer le temps de traitement des requêtes."""
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = f"{process_time:.4f}"
+    return response
+
 # Middleware de timeout pour éviter les requêtes qui traînent
 @app.middleware("http")
 async def timeout_middleware(request: Request, call_next):
+    """Timeout middleware avec timeout adaptatif selon l'endpoint."""
+    # Timeout plus court pour les endpoints d'authentification (10s)
+    # Timeout standard pour les autres endpoints (30s)
+    timeout = 10.0 if request.url.path.startswith("/auth") else 30.0
+    
     try:
-        return await asyncio.wait_for(call_next(request), timeout=30.0)
+        return await asyncio.wait_for(call_next(request), timeout=timeout)
     except asyncio.TimeoutError:
-        return JSONResponse({"detail": "Request timeout"}, status_code=408)
+        return JSONResponse(
+            {"detail": f"Request timeout after {timeout}s"}, 
+            status_code=408
+        )
 
 
 # Rate limiting decorator

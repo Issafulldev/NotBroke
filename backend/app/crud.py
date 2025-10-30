@@ -59,7 +59,10 @@ async def create_user(session: AsyncSession, user: schemas.UserCreate) -> models
 
 
 async def get_user_by_username(session: AsyncSession, username: str) -> models.User | None:
-    """Get a user by username with caching for better performance."""
+    """Get a user by username with caching for better performance.
+    
+    Optimized to only select necessary fields for login, reducing DB load.
+    """
     from .cache import get as cache_get, set as cache_set
     
     # Vérifier le cache d'abord (TTL de 5 minutes pour les données utilisateur)
@@ -79,23 +82,43 @@ async def get_user_by_username(session: AsyncSession, username: str) -> models.U
         )
         return user
     
-    # Requête DB si pas en cache
+    # Requête DB optimisée: ne sélectionner que les champs nécessaires pour le login
+    # Cela réduit la quantité de données transférées depuis la DB
     result = await session.execute(
-        select(models.User).where(models.User.username == username)
+        select(
+            models.User.id,
+            models.User.username,
+            models.User.email,
+            models.User.hashed_password,
+            models.User.is_active,
+            models.User.created_at
+        ).where(models.User.username == username)
     )
-    user = result.scalars().first()
+    row = result.first()
     
-    if user:
-        # Mettre en cache les données utilisateur (TTL de 5 minutes)
-        # Les données utilisateur changent rarement, donc un cache long est acceptable
-        cache_set(cache_key, {
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'hashed_password': user.hashed_password,
-            'is_active': user.is_active,
-            'created_at': user.created_at
-        }, ttl=300)  # 5 minutes
+    if not row:
+        return None
+    
+    # Reconstruire l'objet User depuis les résultats de la requête
+    user = models.User(
+        id=row.id,
+        username=row.username,
+        email=row.email,
+        hashed_password=row.hashed_password,
+        is_active=row.is_active,
+        created_at=row.created_at
+    )
+    
+    # Mettre en cache les données utilisateur (TTL de 5 minutes)
+    # Les données utilisateur changent rarement, donc un cache long est acceptable
+    cache_set(cache_key, {
+        'id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'hashed_password': user.hashed_password,
+        'is_active': user.is_active,
+        'created_at': user.created_at
+    }, ttl=300)  # 5 minutes
     
     return user
 
