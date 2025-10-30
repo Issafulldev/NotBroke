@@ -67,7 +67,7 @@ class Category(Base):
     user: Mapped[User] = relationship("User", back_populates="categories")
 
     __table_args__ = (
-        Index('idx_categories_user_name', 'user_id', 'name'),
+        Index('idx_categories_user_parent_name', 'user_id', 'parent_id', 'name'),
     )
 
     @property
