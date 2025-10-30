@@ -189,6 +189,10 @@ async def create_category(session: AsyncSession, category: schemas.CategoryCreat
     
     logger.info(f"Creating category: user_id={user_id}, name='{original_name}', parent_id={parent_id}")
     
+    # IMPORTANT: Expirer toutes les données dans la session pour s'assurer qu'on voit les données les plus récentes
+    # Cela évite les problèmes de cache de session sur Render/PostgreSQL
+    session.expire_all()
+    
     try:
         # IMPORTANT: Vérifier d'abord s'il existe vraiment des catégories pour cet utilisateur
         # Cela aide à déboguer les problèmes sur Render/PostgreSQL
@@ -207,8 +211,8 @@ async def create_category(session: AsyncSession, category: schemas.CategoryCreat
             except Exception as log_err:
                 logger.warning(f"Could not log categories details: {log_err}")
         
-        # Récupérer les catégories de l'utilisateur avec le même parent_id
-        # Utiliser une approche plus explicite pour PostgreSQL
+        # Récupérer TOUTES les catégories de l'utilisateur avec le même parent_id
+        # Utiliser une approche plus explicite pour PostgreSQL avec NULL-safe comparison
         if parent_id is None:
             # Pour parent_id NULL, utiliser IS NULL explicitement
             existing_query = select(models.Category).where(
@@ -237,24 +241,36 @@ async def create_category(session: AsyncSession, category: schemas.CategoryCreat
                 logger.warning(f"Could not log existing categories details: {log_err}")
         
         # Vérifier manuellement si une catégorie avec le même nom (normalisé) existe
+        # IMPORTANT: Comparer les noms normalisés (minuscules, sans espaces)
         # DOUBLE CHECK: Vérifier aussi que le user_id correspond bien
+        conflict_found = False
+        conflicting_category = None
+        
         for existing in all_existing:
             # Sécurité supplémentaire : vérifier que le user_id correspond
             if existing.user_id != user_id:
                 logger.error(f"CRITICAL: Found category with wrong user_id! category_id={existing.id}, category_user_id={existing.user_id}, expected_user_id={user_id}")
                 continue  # Ignorer cette catégorie car elle ne devrait pas être là
             
-            existing_name_normalized = existing.name.strip().lower()
-            logger.debug(f"Comparing: '{existing_name_normalized}' == '{category_name}' for category_id={existing.id}")
+            # Normaliser le nom de la catégorie existante de la même manière
+            existing_name_normalized = existing.name.strip().lower() if existing.name else ""
+            logger.debug(f"Comparing: existing='{existing_name_normalized}' (from '{existing.name}') == new='{category_name}' (from '{original_name}')")
+            
             if existing_name_normalized == category_name:
+                conflict_found = True
+                conflicting_category = existing
                 logger.warning(
                     f"Category conflict detected: user_id={user_id}, name='{original_name}', "
                     f"existing_id={existing.id}, existing_name='{existing.name}', "
-                    f"existing_parent_id={existing.parent_id}, existing_user_id={existing.user_id}"
+                    f"existing_parent_id={existing.parent_id}, existing_user_id={existing.user_id}, "
+                    f"normalized_existing='{existing_name_normalized}', normalized_new='{category_name}'"
                 )
-                raise CategoryNameConflictError(
-                    f"Category name '{original_name}' already exists"
-                )
+                break  # Sortir de la boucle dès qu'on trouve un conflit
+        
+        if conflict_found and conflicting_category:
+            raise CategoryNameConflictError(
+                f"Category name '{original_name}' already exists"
+            )
         
         logger.info(f"No conflict found for user_id={user_id}, name='{original_name}', proceeding with creation")
     except CategoryNameConflictError:
@@ -275,6 +291,9 @@ async def create_category(session: AsyncSession, category: schemas.CategoryCreat
     if db_category.user_id != user_id:
         logger.error(f"CRITICAL: Category user_id mismatch! Got {db_category.user_id}, expected {user_id}")
         db_category.user_id = user_id
+    
+    # Log final avant insertion
+    logger.info(f"About to insert category: user_id={db_category.user_id}, name='{db_category.name}', parent_id={db_category.parent_id}")
     
     session.add(db_category)
     try:
