@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import time
+import logging
 from datetime import datetime
 from functools import wraps
 from typing import Annotated
@@ -244,8 +245,14 @@ async def on_startup() -> None:
 
 
 # Routes d'authentification
+# Logger pour les endpoints critiques
+logger = logging.getLogger(__name__)
+
+
 @app.post("/auth/register", response_model=schemas.UserRead, status_code=status.HTTP_201_CREATED)
 async def register(request: Request, user: schemas.UserCreate, session=Depends(get_session)):
+    start_time = time.time()
+    
     # Rate limit: 3 registrations per minute
     client_ip = request.client.host if request.client else None
     if not check_rate_limit("/auth/register", client_ip, 3):
@@ -253,7 +260,15 @@ async def register(request: Request, user: schemas.UserCreate, session=Depends(g
     
     try:
         db_user = await crud.create_user(session, user)
+        process_time = time.time() - start_time
         log_security_event("USER_REGISTERED", db_user.id, {"username": user.username})
+        
+        # Log performance pour monitoring
+        logger.info(
+            f"User registration successful for '{user.username}' - "
+            f"Process time: {process_time:.4f}s"
+        )
+        
         return db_user
     except crud.UserAlreadyExistsError as exc:
         log_security_event("REGISTRATION_FAILED", None, {"reason": "user_exists", "username": user.username})
@@ -267,6 +282,8 @@ async def login(
     response: Response,
     session=Depends(get_session)
 ):
+    start_time = time.time()
+    
     client_ip = request.client.host if request.client else None
     if not check_rate_limit("/auth/login", client_ip, 5):
         raise HTTPException(status_code=429, detail="Too many login attempts. Please try again later.")
@@ -295,7 +312,15 @@ async def login(
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
+    process_time = time.time() - start_time
     log_security_event("LOGIN_SUCCESS", user.id, {"username": user.username})
+    
+    # Log performance pour monitoring
+    logger.info(
+        f"Login successful for user '{user.username}' - "
+        f"Process time: {process_time:.4f}s"
+    )
+    
     return {"access_token": access_token, "token_type": "bearer", "user": user}
 
 

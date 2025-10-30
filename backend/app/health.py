@@ -13,17 +13,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .database import get_session, engine
 from . import __version__
+from .cache import get_stats as get_cache_stats
 
 
 async def check_database_health(session: AsyncSession) -> dict[str, Any]:
     """Check database connectivity and health."""
     try:
         # Test database connection
+        start_time = datetime.utcnow()
         result = await session.execute(text("SELECT 1"))
         result.scalar()
+        response_time = (datetime.utcnow() - start_time).total_seconds()
         
         # Get database version if PostgreSQL
-        db_info = {"status": "healthy", "type": "unknown"}
+        db_info = {
+            "status": "healthy",
+            "type": "unknown",
+            "response_time_ms": round(response_time * 1000, 2),
+        }
         try:
             # Try PostgreSQL version query
             version_result = await session.execute(text("SELECT version()"))
@@ -45,18 +52,20 @@ async def check_database_health(session: AsyncSession) -> dict[str, Any]:
         return {
             "status": "unhealthy",
             "error": str(e),
-            "type": "unknown"
+            "type": "unknown",
         }
 
 
 async def get_health_status(
     include_details: bool = Query(False, description="Include detailed system information"),
+    include_performance: bool = Query(False, description="Include performance metrics"),
     session: AsyncSession = Depends(get_session)
 ) -> JSONResponse:
     """
     Health check endpoint with optional detailed system information.
     
     - **include_details**: Include detailed system information (default: False)
+    - **include_performance**: Include performance metrics (cache stats, etc.) (default: False)
     """
     health_status = {
         "status": "ok",
@@ -89,6 +98,12 @@ async def get_health_status(
             "checked_out": pool.checkedout(),
             "overflow": pool.overflow(),
             "checked_in": pool.checkedin(),
+        }
+    
+    # Include performance metrics if requested
+    if include_performance:
+        health_status["performance"] = {
+            "cache": get_cache_stats(),
         }
     
     # Set appropriate HTTP status code

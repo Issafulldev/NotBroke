@@ -77,6 +77,30 @@ Ce document récapitule les optimisations apportées au système de login pour a
 - **Solution:** Timeout adaptatif : 10s pour `/auth/*`, 30s pour les autres endpoints.
 - **Impact:** Détection plus rapide des problèmes de login et meilleure expérience utilisateur.
 
+### 10. Métriques de cache pour le monitoring
+**Fichier modifié:** `backend/app/cache.py`
+
+- **Problème:** Pas de moyen de mesurer l'efficacité du cache.
+- **Solution:** Ajout de statistiques de cache (hits, misses, hit rate, taille actuelle).
+- **Impact:** Permet de monitorer l'efficacité du cache et identifier les opportunités d'optimisation.
+
+### 11. Endpoint /health amélioré avec métriques de performance
+**Fichier modifié:** `backend/app/health.py`
+
+- **Problème:** L'endpoint health ne fournissait pas d'informations sur les performances.
+- **Solution:** 
+  - Ajout du paramètre `include_performance` pour inclure les métriques de cache
+  - Ajout du temps de réponse de la DB (`response_time_ms`)
+  - Disponibilité des statistiques de cache via l'endpoint
+- **Impact:** Monitoring complet de la santé de l'application et de ses performances.
+
+### 12. Logging des temps de réponse pour les endpoints critiques
+**Fichier modifié:** `backend/app/main.py`
+
+- **Problème:** Pas de logs détaillés sur les performances des endpoints critiques.
+- **Solution:** Ajout de logs avec temps de traitement pour `/auth/login` et `/auth/register`.
+- **Impact:** Permet d'identifier les problèmes de performance rapidement via les logs.
+
 ## 📊 Résultats Attendus
 
 ### Avant optimisations:
@@ -98,6 +122,8 @@ Ce document récapitule les optimisations apportées au système de login pour a
 - **Temps de login sur Render:** <300ms (avec cache)
 - **Monitoring:** Header X-Process-Time disponible pour toutes les requêtes
 - **Timeout:** Détection plus rapide des problèmes (10s pour auth vs 30s avant)
+- **Métriques:** Statistiques de cache disponibles via `/health?include_performance=true`
+- **Logs:** Temps de traitement loggés pour login et register
 
 ## 🚀 Déploiement
 
@@ -127,16 +153,25 @@ Pour vérifier l'efficacité des optimisations:
    - Pour le login, vous devriez voir des valeurs < 0.5 (500ms) avec cache, < 1.0 (1s) sans cache
    - Vous pouvez vérifier ce header dans les DevTools du navigateur (onglet Network)
 
-2. **Logs Render:** Vérifier les temps de réponse dans les logs
+2. **Endpoint /health avec métriques:** L'endpoint `/health` peut maintenant inclure des métriques de performance
+   - Utiliser `/health?include_performance=true` pour voir les statistiques de cache
+   - Utiliser `/health?include_details=true` pour voir les détails du pool de connexions
+   - Combiner les deux: `/health?include_details=true&include_performance=true`
+   - Les métriques incluent: hits, misses, hit rate, taille du cache, temps de réponse DB
+
+3. **Logs Render:** Vérifier les temps de réponse dans les logs
    - Les logs montrent maintenant si les traductions sont déjà présentes au démarrage
    - Surveiller les erreurs de timeout (408) pour les endpoints `/auth/*`
+   - Les endpoints login et register loggent maintenant leur temps de traitement
 
-3. **Métriques DB:** Surveiller le nombre de requêtes par endpoint
+4. **Métriques DB:** Surveiller le nombre de requêtes par endpoint
    - Avec le cache, les requêtes de login répétées ne devraient plus faire de requêtes DB
    - Le cache est valid pendant 5 minutes pour chaque utilisateur
+   - Le hit rate du cache peut être vérifié via `/health?include_performance=true`
 
-4. **Cache hit rate:** Les logs devraient montrer moins de requêtes DB pour les utilisateurs en cache
+5. **Cache hit rate:** Les logs devraient montrer moins de requêtes DB pour les utilisateurs en cache
    - Pour vérifier, comparez le temps de réponse avec et sans cache (première requête vs requêtes suivantes)
+   - Un hit rate élevé (>70%) indique que le cache fonctionne efficacement
 
 ## 📝 Notes Techniques
 
